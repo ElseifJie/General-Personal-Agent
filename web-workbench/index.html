@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="General Personal Agent 交互工作台：文本与语音共享同一个 conversation。"
+    />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#fafbfc" />
+    <title>General Personal Agent · 交互工作台</title>
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <style>
+      /* Painted before the bundle loads so a dark preference never flashes white. */
+      html,
+      body {
+        margin: 0;
+        background: #fafbfc;
+      }
+      html[data-theme="dark"],
+      html[data-theme="dark"] body {
+        background: #14161c;
+      }
+    </style>
+    <script>
+      // Resolves the stored theme preference before first paint. Mirrors
+      // src/theme.ts; keep the storage key and the three values in sync.
+      (function () {
+        var resolved = "light";
+        try {
+          var stored = localStorage.getItem("pwa.theme");
+          var preference =
+            stored === "light" || stored === "dark" ? stored : "system";
+          var prefersDark =
+            window.matchMedia &&
+            window.matchMedia("(prefers-color-scheme: dark)").matches;
+          resolved =
+            preference === "dark" || (preference === "system" && prefersDark)
+              ? "dark"
+              : "light";
+        } catch (error) {
+          resolved = "light";
+        }
+        var root = document.documentElement;
+        root.dataset.theme = resolved;
+        root.style.colorScheme = resolved;
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) {
+          meta.setAttribute(
+            "content",
+            resolved === "dark" ? "#14161c" : "#fafbfc",
+          );
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,60 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "general-personal-agent"
+version = "0.1.0"
+description = "General Personal Agent: VeADK personal agent with voice/text adapters, context management, and pluggable MA task backend"
+readme = "README.md"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+  "httpx>=0.28",
+  "websockets>=13",
+  "pydantic-settings>=2.4",
+  "asyncpg>=0.29",
+  "redis>=5.0",
+  "PyJWT>=2.8",
+  "fastmcp>=3.0",
+  "tos>=2.7",
+  "python-dotenv>=1.0",
+  "python-multipart>=0.0.9",
+  "pypdf>=5.0",
+  "python-docx>=1.1",
+  "python-pptx>=1.0",
+  "openpyxl>=3.1",
+  "veadk-python>=1.1.18,<2",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3",
+  "pytest-asyncio>=0.24",
+  "ruff>=0.8",
+]
+
+[project.scripts]
+general-personal-agent = "general_personal_agent.main:run"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/general_personal_agent"]
+
+[tool.uv]
+package = true
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501", "B008"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-q"
+markers = ["integration: Postgres-backed integration test (skipped when PG is unavailable)"]

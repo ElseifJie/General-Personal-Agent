@@ -1,0 +1,13 @@
+{
+  "name": "General Personal Agent · 交互工作台",
+  "short_name": "GPA",
+  "description": "General Personal Agent 交互工作台：文本/语音共享同一个 conversation。",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#fafbfc",
+  "theme_color": "#5965c9",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

@@ -1,0 +1,388 @@
+.ui-app-frame {
+  position: relative;
+  display: grid;
+  grid-template-columns:
+    var(--ui-shell-left-width) minmax(0, 1fr)
+    var(--ui-shell-right-width);
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  /* The frame owns the viewport. Only the center (and an open panel) scrolls,
+     so a deep, absolutely positioned descendant such as a table's sr-only
+     caption can never add a second, page-level scrollbar. */
+  overflow: hidden;
+  background: var(--ui-color-surface-canvas);
+  color: var(--ui-color-text);
+}
+
+.ui-app-frame[data-right-mode="closed"] {
+  grid-template-columns: var(--ui-shell-left-width) minmax(0, 1fr);
+}
+
+.ui-app-frame[data-right-mode="overlay"] {
+  grid-template-columns: var(--ui-shell-left-width) minmax(0, 1fr);
+  position: relative;
+}
+
+.ui-app-frame__left {
+  min-width: 0;
+  overflow: auto;
+  border-right: 1px solid var(--ui-color-border);
+  background: var(--ui-color-navigation);
+}
+
+.ui-app-frame__center {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.ui-app-frame__right {
+  position: relative;
+  min-width: 0;
+  overflow: auto;
+  border-left: 1px solid var(--ui-color-border);
+  background: var(--ui-color-surface);
+}
+
+.ui-app-frame__right--overlay {
+  position: absolute;
+  z-index: 20;
+  inset: 0 0 0 auto;
+  width: min(100%, var(--ui-shell-right-width));
+  box-shadow: var(--ui-shadow-overlay);
+}
+
+.ui-app-frame__resizer {
+  position: absolute;
+  z-index: 15;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  transform: translateX(-4px);
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.ui-app-frame__resizer--left {
+  left: var(--ui-shell-left-width);
+}
+
+.ui-app-frame__resizer--right {
+  right: var(--ui-shell-right-width);
+}
+
+.ui-app-frame__resizer:hover,
+.ui-app-frame__resizer.is-resizing {
+  background: var(--ui-color-accent-subtle);
+}
+
+.ui-app-frame__resizer:focus-visible {
+  outline: 2px solid var(--ui-focus-ring);
+  outline-offset: -2px;
+}
+
+.ui-app-frame__drawer-backdrop {
+  position: fixed;
+  z-index: 45;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  background: rgb(0 0 0 / 35%);
+  cursor: pointer;
+}
+
+.ui-app-frame[data-drawer="open"] .ui-app-frame__left {
+  position: fixed;
+  z-index: 50;
+  inset: 0 auto 0 0;
+  width: min(280px, 85vw);
+  max-width: 85vw;
+  box-shadow: var(--ui-shadow-overlay);
+}
+
+.ui-app-frame__overlay-close {
+  position: absolute;
+  z-index: 25;
+  top: var(--ui-space-2);
+  right: var(--ui-space-2);
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid var(--ui-color-border);
+  border-radius: 50%;
+  background: var(--ui-color-surface);
+  color: var(--ui-color-text);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: var(--ui-shadow-raised);
+}
+
+.ui-app-frame__overlay-close:hover {
+  background: var(--ui-color-surface-hover);
+}
+
+.ui-app-frame__overlay-close:focus-visible {
+  outline: 2px solid var(--ui-focus-ring);
+  outline-offset: 2px;
+}
+
+@media (max-width: 767px) {
+  .ui-app-frame,
+  .ui-app-frame[data-right-mode="overlay"] {
+    grid-template-columns: var(--ui-shell-left-width) minmax(0, 1fr);
+  }
+
+  .ui-app-frame__right--overlay {
+    inset: 0;
+    width: 100%;
+  }
+}
+
+.ui-panel-host {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.ui-panel-host__tabs {
+  display: flex;
+  gap: var(--ui-space-1);
+  overflow-x: auto;
+  padding: var(--ui-space-2);
+  border-bottom: 1px solid var(--ui-color-border);
+}
+
+.ui-panel-host__tab {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  border-radius: 6px;
+}
+
+.ui-panel-host__tab[data-active="true"] {
+  background: var(--ui-color-surface-subtle);
+}
+
+.ui-panel-host__tab [role="tab"] {
+  min-width: 0;
+  max-width: 16rem;
+  overflow: hidden;
+  padding: var(--ui-space-2) var(--ui-space-3);
+  border: 0;
+  background: transparent;
+  color: var(--ui-color-text-secondary);
+  font: inherit;
+  font-size: var(--ui-font-size-control);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ui-panel-host__tab [role="tab"][aria-selected="true"] {
+  color: var(--ui-color-text);
+}
+
+.ui-panel-host__tab [role="tab"]:focus-visible,
+.ui-panel-host__close:focus-visible {
+  outline: 2px solid var(--ui-focus-ring);
+  outline-offset: -2px;
+}
+
+.ui-panel-host__close {
+  padding: var(--ui-space-1);
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ui-color-text-muted);
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.ui-panel-host__close:hover {
+  background: var(--ui-color-surface-hover);
+  color: var(--ui-color-text);
+}
+
+.ui-panel-host__body {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+}
+
+.ui-panel-host__empty {
+  margin: 0;
+  padding: var(--ui-space-6);
+  color: var(--ui-color-text-muted);
+  font-size: var(--ui-font-size-aux);
+}
+
+/* Workspace navigation hosted inside the frame's left region. */
+.workspace-nav {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+}
+
+/* The rail is a compact index, not a marketing page: keep the brand, the
+   primary destinations and the session list on a tighter vertical rhythm so
+   more of the current work stays visible without scrolling. */
+.workspace-nav .ui-app-shell__brand {
+  min-height: 64px;
+  padding-inline: var(--ui-space-3);
+}
+
+.workspace-nav .ui-app-shell__navigation {
+  min-height: 0;
+  padding: var(--ui-space-1) var(--ui-space-2) var(--ui-space-2);
+}
+
+.workspace-nav .ui-app-shell__navigation-primary {
+  gap: 2px;
+}
+
+.workspace-nav .ui-app-shell__navigation-link {
+  min-height: 2.25rem;
+  padding-block: var(--ui-space-1);
+}
+
+.workspace-nav .ui-app-shell__navigation-extra {
+  margin-top: var(--ui-space-3);
+  padding-top: var(--ui-space-3);
+}
+
+.workspace-nav .ui-app-shell__footer {
+  padding: var(--ui-space-2);
+}
+
+.workspace-nav .session-list {
+  gap: var(--ui-space-2);
+}
+
+.workspace-nav .session-group__list {
+  gap: 1px;
+}
+
+.workspace-nav .session-row__link {
+  min-height: 2.25rem;
+  padding-block: var(--ui-space-1);
+}
+
+/* Touch keeps comfortable targets even though the desktop rail is denser. */
+@media (pointer: coarse) {
+  .workspace-nav .ui-app-shell__navigation-link,
+  .workspace-nav .session-row__link {
+    min-height: var(--ui-control-height-default);
+    padding-block: var(--ui-space-2);
+  }
+}
+
+.workspace-nav__compact-actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--ui-space-1);
+  padding: var(--ui-space-1) 0;
+}
+
+.workspace-nav[data-collapsed="true"] .ui-app-shell__brand {
+  min-height: 56px;
+  justify-content: center;
+  padding-inline: 0;
+}
+
+.workspace-nav[data-collapsed="true"] .ui-app-shell__navigation {
+  padding-inline: var(--ui-space-1);
+}
+
+.workspace-nav[data-collapsed="true"] .ui-app-shell__navigation-link {
+  justify-content: center;
+  padding-inline: 0;
+}
+
+.workspace-nav[data-collapsed="true"] .ui-app-shell__navigation-link > span {
+  display: none;
+}
+
+.workspace-nav[data-collapsed="true"] .ui-app-shell__navigation-extra {
+  display: none;
+}
+
+.workspace-nav[data-collapsed="true"] .ui-app-shell__footer {
+  padding-inline: var(--ui-space-1);
+}
+
+.workspace-nav[data-collapsed="true"] .ui-app-shell__user-trigger {
+  justify-content: center;
+  padding-inline: 0;
+}
+
+.workspace-nav[data-collapsed="true"] .ui-app-shell__user-identity,
+.workspace-nav[data-collapsed="true"] .ui-app-shell__user-more {
+  display: none;
+}
+
+/* The frame's center is the scroll container; pages size themselves inside. */
+.workspace-main {
+  width: min(100%, 1200px);
+  min-height: 100%;
+  margin-inline: auto;
+  padding: var(--ui-space-12) var(--ui-space-8);
+}
+
+.workspace-main > .page {
+  min-height: 0;
+  padding: 0;
+}
+
+.workspace-main > .session-intro {
+  width: min(100%, 50rem);
+  padding: clamp(var(--ui-space-6), 8vh, 6rem) 0 0;
+  container: new-task / inline-size;
+}
+
+.workspace-main:has(> .session-workspace) {
+  width: 100%;
+  max-width: none;
+  padding: 0;
+}
+
+@media (max-width: 1024px) {
+  .workspace-main {
+    padding: var(--ui-space-8) var(--ui-space-6);
+  }
+}
+
+@media (max-width: 767px) {
+  .workspace-main {
+    padding: var(--ui-space-5) var(--ui-space-4);
+  }
+}
+
+.artifact-panel__state {
+  display: grid;
+  min-height: 100%;
+  place-content: center;
+  gap: var(--ui-space-3);
+  padding: var(--ui-space-6);
+  color: var(--ui-color-text-muted);
+  text-align: center;
+}
+
+.artifact-panel__state p {
+  margin: 0;
+}
+
+.ui-panel-host__body > .artifact-viewer {
+  height: 100%;
+}

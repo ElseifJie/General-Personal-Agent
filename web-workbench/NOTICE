@@ -1,0 +1,38 @@
+# NOTICE
+
+## 第三方代码来源（MIT）
+
+本工程前端（`web-workbench/`）的设计系统与部分组件从 **MAWorker**
+（`MAWoker/apps/web`，MIT License）拷贝并适配而来。上游版权与许可全文见
+`THIRD_PARTY_LICENSE_MAWORKER`。
+
+- 上游基线 commit：`44c9efb`（2026-10-18）
+- 上游版权：Copyright (c) 2026 wangjie
+- 上游许可：MIT
+
+### 仍然继承的目录/文件
+
+以下文件保留上游实现（仅按本工程 API 契约做小幅适配）：
+
+- `src/ui/*` — tokens / components / layouts / AppShell / Button / DataTable /
+  Dialog / Feedback / FormControls / PageHeader / RowActionsMenu
+- `src/shell/*` — AppFrame / PanelHost / WorkspaceFrame / WorkspaceNav /
+  index / layout / shell-state / useShellLayout / shell.css
+- `src/components/` — CommandPalette / Markdown / NewMessages
+- `src/markdown/remarkArtifactLinks.ts`
+- `src/submission-drafts.ts`
+- `src/theme.ts`、`src/pwa.ts`、`src/useModalDialog.ts`、`src/inert.d.ts`
+- `src/styles.css`（页面级样式）
+
+### 已重写或本工程原生
+
+- `src/App.tsx`、`src/main.tsx`、`src/api.ts`、`src/gpaApi.ts`
+- 页面：`FilesPage` / `KnowledgePage` / `ContextPage` / `LoginPage` /
+  `SettingsPage` / `TaskDetailPage`
+- `src/interaction/*`（会话工作台）、`src/voice/*`（语音通道）、
+  `src/context/*`、`src/knowledge.css`
+
+## 依赖
+
+- Python 依赖见 `pyproject.toml`
+- 前端依赖见 `web-workbench/package.json`

@@ -1,0 +1,147 @@
+/*
+ * Task workbench: quiet navigation, distinct reading surfaces and a single
+ * indigo accent. Both themes share typography, spacing and control geometry.
+ */
+:root {
+  color-scheme: dark;
+
+  --ui-font-sans:
+    "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", -apple-system,
+    BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --ui-font-mono:
+    "Berkeley Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+  font-feature-settings: "cv01", "ss03";
+
+  --ui-font-size-body: 1rem;
+  --ui-font-size-control: 0.875rem;
+  --ui-font-size-aux: 0.8125rem;
+  --ui-font-size-section: 1.125rem;
+  --ui-font-size-section-large: 1.25rem;
+  --ui-font-size-page: 1.5rem;
+  --ui-font-size-page-large: 1.75rem;
+  --ui-font-size-hero: 2rem;
+  --ui-line-height-body: 1.65;
+  --ui-line-height-control: 1.5;
+  --ui-line-height-heading: 1.3;
+
+  /* Luminance-stepped surfaces (spec §2 Background Surfaces). */
+  --ui-color-surface-canvas: #14161c;
+  --ui-color-surface: #1b1e26;
+  --ui-color-surface-subtle: #222632;
+  --ui-color-surface-hover: #2c3140;
+  --ui-color-navigation: #181b23;
+
+  /* Borders are translucent white on dark, never solid dark colors. */
+  --ui-color-border: #303542;
+  --ui-color-border-strong: #464e60;
+
+  /* Four-step text ramp (spec §2 Text & Content). */
+  --ui-color-text: #f7f8f8;
+  --ui-color-text-secondary: #d0d6e0;
+  --ui-color-text-muted: #a0a8ba;
+  --ui-color-text-faint: #8993a7;
+  --ui-color-text-inverse: #ffffff;
+
+  /* Brand indigo — the only chromatic chrome color, reserved for CTAs,
+   * links, and active states. */
+  --ui-color-accent: #5e6ad2;
+  --ui-color-accent-interactive: #828fff;
+  --ui-color-accent-hover: #828fff;
+  --ui-color-accent-subtle: #242738;
+  --ui-color-accent-contrast: #ffffff;
+
+  /* Status colors appear only in badges, status dots, and alerts. */
+  --ui-color-success: #3fb950;
+  --ui-color-success-strong: #10b981;
+  --ui-color-success-subtle: #183029;
+  --ui-color-warning: #d9a942;
+  --ui-color-warning-subtle: #342e21;
+  --ui-color-danger: #eb5757;
+  --ui-color-danger-hover: #f25555;
+  --ui-color-danger-subtle: #2d1f1f;
+
+  --ui-focus-ring: #7170ff;
+  --ui-color-overlay: rgb(0 0 0 / 85%);
+  --ui-color-embed-canvas: #ffffff;
+
+  /* Depth on dark surfaces comes from luminance steps, not shadow darkness
+   * (spec §6); shadows only soften floating layers. */
+  --ui-shadow-raised: 0 2px 8px rgb(0 0 0 / 10%);
+  --ui-shadow-overlay: 0 16px 48px rgb(0 0 0 / 32%);
+
+  --ui-space-1: 0.25rem;
+  --ui-space-2: 0.5rem;
+  --ui-space-3: 0.75rem;
+  --ui-space-4: 1rem;
+  --ui-space-6: 1.5rem;
+  --ui-space-8: 2rem;
+  --ui-space-12: 3rem;
+
+  /* Controls use 8px corners, panels 12px and the composer 16px. */
+  --ui-radius-small: 0.5rem;
+  --ui-radius-medium: 0.5rem;
+  --ui-radius-large: 0.75rem;
+  --ui-radius-composer: 1rem;
+
+  --ui-control-height-small: 2.5rem;
+  --ui-control-height-default: 2.5rem;
+  --ui-control-height-large: 2.5rem;
+
+  --ui-sidebar-width: 15.5rem;
+  --ui-rail-width: 21.25rem;
+  --ui-transcript-max-width: 47.5rem;
+}
+
+@media (pointer: coarse) {
+  :root {
+    --ui-control-height-small: 2.75rem;
+    --ui-control-height-default: 2.75rem;
+    --ui-control-height-large: 2.75rem;
+  }
+}
+
+/*
+ * Light theme keeps the same semantic variables using the spec's Light
+ * Neutrals; the text ramp inverts while the brand indigo stays the accent.
+ * index.html resolves and sets data-theme before first paint.
+ */
+[data-theme="light"] {
+  color-scheme: light;
+  --ui-color-surface-canvas: #fafbfc;
+  --ui-color-surface: #ffffff;
+  --ui-color-surface-subtle: #f3f5f8;
+  --ui-color-surface-hover: #e8ecf3;
+  --ui-color-navigation: #f0f2f6;
+
+  --ui-color-border: #e3e6ee;
+  --ui-color-border-strong: #c9d0de;
+
+  --ui-color-text: #242832;
+  --ui-color-text-secondary: #3f444d;
+  --ui-color-text-muted: #687081;
+  --ui-color-text-faint: #727c8d;
+  --ui-color-text-inverse: #ffffff;
+
+  --ui-color-accent: #5965c9;
+  --ui-color-accent-interactive: #4450c0;
+  --ui-color-accent-hover: #3f47a0;
+  --ui-color-accent-subtle: #eceefb;
+  --ui-color-accent-contrast: #ffffff;
+
+  --ui-color-success: #157347;
+  --ui-color-success-strong: #0e9f6e;
+  --ui-color-success-subtle: #e8f5ee;
+  --ui-color-warning: #8a5f10;
+  --ui-color-warning-subtle: #fdf3e0;
+  --ui-color-danger: #b42318;
+  --ui-color-danger-hover: #8f1c13;
+  --ui-color-danger-subtle: #fef3f2;
+
+  --ui-focus-ring: #5e6ad2;
+  --ui-color-overlay: rgb(16 18 21 / 42%);
+  --ui-color-embed-canvas: #ffffff;
+  --ui-shadow-raised: 0 2px 8px rgb(30 41 59 / 4%);
+  --ui-shadow-overlay:
+    0 14px 36px rgb(16 18 21 / 12%), 0 2px 8px rgb(16 18 21 / 8%);
+}

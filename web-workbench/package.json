@@ -1,0 +1,31 @@
+{
+  "name": "general-personal-agent-workbench",
+  "private": true,
+  "version": "0.2.0",
+  "type": "module",
+  "description": "General Personal Agent 交互工作台（文本/语音共享 conversation；设计移植自 MAWorker apps/web，MIT）",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "preview": "vite preview",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "jszip": "^3.10.2",
+    "lucide-react": "^1.61.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-markdown": "^10.1.0",
+    "react-router-dom": "^7.18.4",
+    "remark-gfm": "^4.0.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.7.0",
+    "typescript": "^5.9.3",
+    "vite": "^5.4.21"
+  }
+}

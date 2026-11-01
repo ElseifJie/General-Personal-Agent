@@ -1,0 +1,149 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: demo
+          POSTGRES_PASSWORD: demo
+          POSTGRES_DB: gpa_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U demo -d gpa_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Set up Python
+        run: uv python install 3.12
+      - name: Create venv
+        run: uv venv .venv --python 3.12
+      - name: Install
+        run: uv pip install --python .venv/bin/python -e ".[dev]"
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Lint
+        run: .venv/bin/ruff check src tests scripts
+      - name: Test (isolated PostgreSQL schema)
+        env:
+          TEST_DATABASE_URL: postgresql+asyncpg://demo:demo@127.0.0.1:5432/gpa_test
+          DATABASE_URL: postgresql+asyncpg://demo:demo@127.0.0.1:5432/gpa_app_never_used
+        run: .venv/bin/pytest
+
+  build-wb:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web-workbench/package-lock.json
+      - name: Install
+        working-directory: web-workbench
+        run: npm ci --no-audit --no-fund
+      - name: Typecheck
+        working-directory: web-workbench
+        run: npm run typecheck
+      - name: Build workbench SPA
+        working-directory: web-workbench
+        run: npm run build
+      - name: Verify dist artifacts
+        run: |
+          test -f web-workbench/dist/index.html
+          ls web-workbench/dist/assets/ | grep -q "\.js$"
+          ls web-workbench/dist/assets/ | grep -q "\.css$"
+
+  playwright:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: demo
+          POSTGRES_PASSWORD: demo
+          POSTGRES_DB: gpa_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U demo -d gpa_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Set up Python
+        run: uv python install 3.12
+      - name: Create venv
+        run: uv venv .venv --python 3.12
+      - name: Install
+        run: uv pip install --python .venv/bin/python -e ".[dev]"
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web-workbench/package-lock.json
+      - name: Install frontend
+        working-directory: web-workbench
+        run: npm ci --no-audit --no-fund
+      - name: Build SPA
+        working-directory: web-workbench
+        run: npm run build
+      - name: Migrate E2E database
+        env:
+          PGPASSWORD: demo
+        run: |
+          for f in db/schema.sql db/migrations/*.sql; do
+            psql -h 127.0.0.1 -U demo -d gpa_e2e -v ON_ERROR_STOP=1 -f "$f"
+          done
+      - name: Start app
+        env:
+          DATABASE_URL: postgresql+asyncpg://demo:demo@127.0.0.1:5432/gpa_e2e
+          APP_SECRET_KEY: ci-e2e-secret
+          DEMO_LOGIN_PIN: "1234"
+          GPA_AGENT_MODE: stub
+          GPA_FILES_ROLLOUT: all
+          OV_URL: http://127.0.0.1:9
+          OV_TIMEOUT_S: "1"
+          OV_USER_KEY_ADMIN: ci-test-admin
+          OV_USER_KEY_ALICE: ci-test-alice
+          OV_USER_KEY_BOB: ci-test-bob
+        run: |
+          nohup .venv/bin/python -m uvicorn general_personal_agent.main:app \
+            --host 127.0.0.1 --port 8100 > /tmp/gpa-e2e.log 2>&1 &
+          for i in $(seq 1 40); do
+            if curl -sf http://127.0.0.1:8100/health >/dev/null; then break; fi
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:8100/health
+      - name: Run Playwright smoke
+        working-directory: web-workbench
+        env:
+          WB_E2E_PIN: "1234"
+        run: |
+          npx playwright install --with-deps chromium
+          npx playwright test e2e/gpa.spec.mjs e2e/voice.spec.mjs
+      - name: Upload app log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gpa-e2e-log
+          path: /tmp/gpa-e2e.log
