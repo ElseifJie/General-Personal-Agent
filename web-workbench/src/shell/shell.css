@@ -369,20 +369,6 @@
   }
 }
 
-.artifact-panel__state {
-  display: grid;
-  min-height: 100%;
-  place-content: center;
-  gap: var(--ui-space-3);
-  padding: var(--ui-space-6);
-  color: var(--ui-color-text-muted);
-  text-align: center;
-}
-
-.artifact-panel__state p {
-  margin: 0;
-}
-
 .ui-panel-host__body > .artifact-viewer {
   height: 100%;
 }
