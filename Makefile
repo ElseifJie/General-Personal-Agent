@@ -49,6 +49,8 @@ db:
 	psql "$(DB)" -f db/migrations/014_files.sql
 	psql "$(DB)" -f db/migrations/015_reliability_fixes.sql
 	psql "$(DB)" -f db/migrations/016_gc_outbox_recovery.sql
+	psql "$(DB)" -f db/migrations/017_task_partial_status.sql
+	psql "$(DB)" -f db/migrations/018_task_retry_backoff.sql
 
 db-migrate:
 	psql "$(DB)" -f db/migrations/003_wb.sql
@@ -65,6 +67,8 @@ db-migrate:
 	psql "$(DB)" -f db/migrations/014_files.sql
 	psql "$(DB)" -f db/migrations/015_reliability_fixes.sql
 	psql "$(DB)" -f db/migrations/016_gc_outbox_recovery.sql
+	psql "$(DB)" -f db/migrations/017_task_partial_status.sql
+	psql "$(DB)" -f db/migrations/018_task_retry_backoff.sql
 
 build-wb:
 	cd web-workbench && npm ci && npm run build

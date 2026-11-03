@@ -35,7 +35,7 @@ function goalTitle(goal: string): string {
 function tone(status: TaskView["status"]) {
   if (status === "completed") return "success" as const;
   if (status === "failed") return "danger" as const;
-  if (status === "cancelled") return "warning" as const;
+  if (status === "partial" || status === "cancelled") return "warning" as const;
   return "info" as const;
 }
 
@@ -192,6 +192,12 @@ export function TaskDetailPage({ onAuthRequired }: { onAuthRequired: () => void 
         {task.error && task.status === "failed" ? (
           <Alert tone="danger">
             {String(task.error.message ?? task.error.code ?? "任务失败")}
+          </Alert>
+        ) : null}
+        {task.error && task.status === "partial" ? (
+          <Alert tone="warning">
+            任务未走完收尾流程：{String(task.error.message ?? task.error.code ?? "执行中断")}。
+            已完成的产物可直接下载，但缺少完整总结与最终核验。
           </Alert>
         ) : null}
       </section>

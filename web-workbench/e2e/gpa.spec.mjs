@@ -37,7 +37,11 @@ test("text conversation streams a reply and keeps the conversation id", async ({
   await expect(page.locator(".gpa-page--voice")).toBeVisible();
   await expect(page.getByRole("button", { name: /按住说话/ })).toBeVisible();
   await expect(page.locator('textarea')).toHaveCount(0);
-  await expect(page.locator(".session-connection--success")).toBeVisible({ timeout: 10_000 });
+  // The header carries no status line any more; the mic enabling means the
+  // voice WebSocket said ready.
+  await expect(page.getByRole("button", { name: /按住说话/ })).toBeEnabled({
+    timeout: 10_000,
+  });
 
   await page.getByRole("button", { name: "文本", exact: true }).click();
   await expect(page).toHaveURL(conversationUrl);
@@ -87,7 +91,10 @@ test("new conversation page starts a brand-new voice conversation", async ({ pag
   ).toBeVisible();
   await expect(page.locator('textarea')).toHaveCount(0);
   await expect(page.getByRole("button", { name: /按住说话/ })).toBeVisible();
-  await expect(page.locator(".session-connection--success")).toBeVisible({ timeout: 10_000 });
+  // No status line in the header any more: an enabled mic means the WS is ready.
+  await expect(page.getByRole("button", { name: /按住说话/ })).toBeEnabled({
+    timeout: 10_000,
+  });
   await expect(page.getByText("正在继续", { exact: false })).toHaveCount(0);
 });
 

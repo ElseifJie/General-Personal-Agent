@@ -2,6 +2,7 @@ import { Mic, Square } from "lucide-react";
 import { useRef } from "react";
 
 import { Button } from "../ui/index";
+import { useHoldToTalk } from "./useHoldToTalk";
 import type { VoiceStatus } from "./useVoiceSession";
 
 export function VoiceComposer({
@@ -19,51 +20,45 @@ export function VoiceComposer({
   onInterrupt: () => void;
   isRecording: boolean;
 }) {
-  const holdingRef = useRef(false);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
   const busy = status === "thinking" || status === "speaking";
   const disabled = !connected || status === "connecting" || status === "error";
-
-  function start() {
-    if (disabled || isRecording) return;
-    holdingRef.current = true;
-    onStart();
-  }
-
-  function stop() {
-    if (!holdingRef.current) return;
-    holdingRef.current = false;
-    onStop();
-  }
+  const { hold, release } = useHoldToTalk({
+    enabled: !disabled && !isRecording,
+    onStart,
+    onStop,
+    buttonRef,
+  });
 
   return (
     <div className="gpa-voice-composer">
       <button
+        ref={buttonRef}
         type="button"
         className={`gpa-talk${isRecording ? " is-recording" : ""}`}
         aria-pressed={isRecording}
         aria-label="按住说话，松开结束"
+        aria-keyshortcuts="Space Enter"
+        title={
+          disabled
+            ? status === "error"
+              ? "语音链路异常：先点“重连语音”，或切换到文本交互"
+              : "语音正在连接，连上后按住即可说话"
+            : "按住说话，松开结束（也可以按住空格或回车）"
+        }
         disabled={disabled}
         onPointerDown={(event) => {
           event.preventDefault();
           event.currentTarget.setPointerCapture(event.pointerId);
-          start();
+          hold("pointer");
         }}
         onPointerUp={(event) => {
           event.preventDefault();
-          stop();
+          release("pointer");
         }}
-        onPointerCancel={stop}
+        onPointerCancel={() => release("pointer")}
+        onLostPointerCapture={() => release("pointer")}
         onContextMenu={(event) => event.preventDefault()}
-        onKeyDown={(event) => {
-          if (event.key !== " " && event.key !== "Enter") return;
-          event.preventDefault();
-          if (!event.repeat) start();
-        }}
-        onKeyUp={(event) => {
-          if (event.key !== " " && event.key !== "Enter") return;
-          event.preventDefault();
-          stop();
-        }}
       >
         <span className="gpa-talk__orb" aria-hidden="true">
           <Mic size={20} />

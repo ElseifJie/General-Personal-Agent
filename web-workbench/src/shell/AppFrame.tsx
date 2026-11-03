@@ -1,13 +1,6 @@
-import {
-  useEffect,
-  useRef,
-  useState,
-  type CSSProperties,
-  type KeyboardEvent as ReactKeyboardEvent,
-  type PointerEvent as ReactPointerEvent,
-  type ReactNode,
-} from "react";
+import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import { SHELL_LAYOUT, type ShellLayoutResult } from "./layout";
+import { useResizeHandle } from "./useResizeHandle";
 import "./shell.css";
 
 const focusableSelector =
@@ -51,14 +44,6 @@ export function AppFrame({
   rightResizeLabel = "调整面板宽度",
 }: AppFrameProps) {
   const leftRef = useRef<HTMLElement>(null);
-  const resizeStartRef = useRef<{
-    edge: "left" | "right";
-    startX: number;
-    startWidth: number;
-  } | null>(null);
-  const [resizingEdge, setResizingEdge] = useState<"left" | "right" | null>(
-    null,
-  );
   const style = {
     "--ui-shell-left-width": `${layout.leftWidth}px`,
     "--ui-shell-right-width": `${layout.rightWidth}px`,
@@ -74,74 +59,22 @@ export function AppFrame({
   );
   const rightMin = Math.min(SHELL_LAYOUT.rightMin, rightMax);
   const leftMax = SHELL_LAYOUT.leftMax;
-  const clampLeft = (width: number) =>
-    Math.round(Math.min(leftMax, Math.max(SHELL_LAYOUT.leftMin, width)));
-  const clampRight = (width: number) =>
-    Math.round(Math.min(rightMax, Math.max(rightMin, width)));
-
-  function beginResize(
-    edge: "left" | "right",
-    event: ReactPointerEvent<HTMLDivElement>,
-  ) {
-    event.preventDefault();
-    if (typeof event.currentTarget.setPointerCapture === "function") {
-      event.currentTarget.setPointerCapture(event.pointerId);
-    }
-    resizeStartRef.current = {
-      edge,
-      startX: event.clientX,
-      startWidth: edge === "left" ? layout.leftWidth : layout.rightWidth,
-    };
-    setResizingEdge(edge);
-  }
-
-  function moveResize(event: ReactPointerEvent<HTMLDivElement>) {
-    const start = resizeStartRef.current;
-    if (!start) return;
-    const delta = event.clientX - start.startX;
-    if (start.edge === "left") {
-      onLeftWidthChange?.(clampLeft(start.startWidth + delta));
-    } else {
-      onRightWidthChange?.(clampRight(start.startWidth - delta));
-    }
-  }
-
-  function endResize(event: ReactPointerEvent<HTMLDivElement>) {
-    if (
-      typeof event.currentTarget.hasPointerCapture === "function" &&
-      event.currentTarget.hasPointerCapture(event.pointerId) &&
-      typeof event.currentTarget.releasePointerCapture === "function"
-    ) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-    resizeStartRef.current = null;
-    setResizingEdge(null);
-  }
-
-  function resizeKeyDown(
-    edge: "left" | "right",
-    event: ReactKeyboardEvent<HTMLDivElement>,
-  ) {
-    const step = 24;
-    let next: number | undefined;
-    if (edge === "left") {
-      if (event.key === "ArrowRight") next = layout.leftWidth + step;
-      else if (event.key === "ArrowLeft") next = layout.leftWidth - step;
-      else if (event.key === "Home") next = SHELL_LAYOUT.leftMin;
-      else if (event.key === "End") next = leftMax;
-      if (next === undefined) return;
-      event.preventDefault();
-      onLeftWidthChange?.(clampLeft(next));
-      return;
-    }
-    if (event.key === "ArrowLeft") next = layout.rightWidth + step;
-    else if (event.key === "ArrowRight") next = layout.rightWidth - step;
-    else if (event.key === "Home") next = rightMin;
-    else if (event.key === "End") next = rightMax;
-    if (next === undefined) return;
-    event.preventDefault();
-    onRightWidthChange?.(clampRight(next));
-  }
+  const leftHandle = useResizeHandle({
+    growToward: "right",
+    width: layout.leftWidth,
+    min: SHELL_LAYOUT.leftMin,
+    max: leftMax,
+    label: leftResizeLabel,
+    onChange: (width) => onLeftWidthChange?.(width),
+  });
+  const rightHandle = useResizeHandle({
+    growToward: "left",
+    width: layout.rightWidth,
+    min: rightMin,
+    max: rightMax,
+    label: rightResizeLabel,
+    onChange: (width) => onRightWidthChange?.(width),
+  });
 
   useEffect(() => {
     if (!drawerOpen) return;
@@ -209,20 +142,9 @@ export function AppFrame({
       {layout.leftMode === "expanded" && onLeftWidthChange ? (
         <div
           className={`ui-app-frame__resizer ui-app-frame__resizer--left${
-            resizingEdge === "left" ? " is-resizing" : ""
+            leftHandle.resizing ? " is-resizing" : ""
           }`}
-          role="separator"
-          aria-orientation="vertical"
-          aria-label={leftResizeLabel}
-          aria-valuemin={SHELL_LAYOUT.leftMin}
-          aria-valuemax={leftMax}
-          aria-valuenow={layout.leftWidth}
-          tabIndex={0}
-          onPointerDown={(event) => beginResize("left", event)}
-          onPointerMove={moveResize}
-          onPointerUp={endResize}
-          onPointerCancel={endResize}
-          onKeyDown={(event) => resizeKeyDown("left", event)}
+          {...leftHandle.separatorProps}
         />
       ) : null}
       {drawerOpen ? (
@@ -266,20 +188,9 @@ export function AppFrame({
       {layout.rightMode === "panel" && onRightWidthChange ? (
         <div
           className={`ui-app-frame__resizer ui-app-frame__resizer--right${
-            resizingEdge === "right" ? " is-resizing" : ""
+            rightHandle.resizing ? " is-resizing" : ""
           }`}
-          role="separator"
-          aria-orientation="vertical"
-          aria-label={rightResizeLabel}
-          aria-valuemin={rightMin}
-          aria-valuemax={rightMax}
-          aria-valuenow={layout.rightWidth}
-          tabIndex={0}
-          onPointerDown={(event) => beginResize("right", event)}
-          onPointerMove={moveResize}
-          onPointerUp={endResize}
-          onPointerCancel={endResize}
-          onKeyDown={(event) => resizeKeyDown("right", event)}
+          {...rightHandle.separatorProps}
         />
       ) : null}
     </div>

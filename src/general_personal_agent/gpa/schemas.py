@@ -14,7 +14,9 @@ from pydantic.alias_generators import to_camel
 
 Channel = Literal["text", "voice"]
 TurnStatus = Literal["running", "completed", "failed", "cancelled"]
-TaskStatusName = Literal["queued", "running", "completed", "failed", "cancelled"]
+TaskStatusName = Literal[
+    "queued", "running", "completed", "partial", "failed", "cancelled"
+]
 
 AgentEventType = Literal[
     "turn.started",

@@ -167,7 +167,19 @@ class Settings(BaseSettings):
     # sessions to a specific agent build (old builds may lack newer tools).
     ma_agent_version: int = 0
     ma_poll_interval_s: float = 2.0
-    task_timeout_s: int = 300
+    # 总时长护栏：只用来兜底失控会话的计费，不用于打断仍在推进的任务。
+    task_timeout_s: int = 1800
+    # 活跃度预算：连续这么久没有任何新 MA 事件才判定卡死（有新事件会续期）。
+    task_idle_timeout_s: int = 300
+    # 可重试错误（上游 5xx / 会话失败）的额外重试次数。
+    task_max_retry: int = 2
+    # 重试的指数退避基数与上限（秒）；0 表示立即重试。
+    task_retry_backoff_s: float = 30.0
+    task_retry_backoff_max_s: float = 300.0
+    # 进度事件最小间隔，避免每个 poll 都写一条 task_event。
+    task_progress_interval_s: float = 20.0
+    # MA 报 idle 后产物注册有延迟，空结果继续等待的窗口。
+    task_artifact_grace_s: int = 15
     task_artifact_ttl_days: int = 7
     gpa_artifact_cleanup_enabled: bool = True
     gpa_artifact_cleanup_interval_s: int = 3600

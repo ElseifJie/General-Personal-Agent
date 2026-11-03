@@ -619,7 +619,6 @@ select:not(.ui-select):hover {
 }
 
 .session-header,
-.session-meta,
 .session-header-actions {
   display: flex;
   align-items: center;
@@ -686,16 +685,6 @@ select:not(.ui-select):hover {
   overflow-wrap: anywhere;
 }
 
-.session-meta {
-  min-width: 0;
-  flex-wrap: wrap;
-  gap: var(--ui-space-1) var(--ui-space-3);
-  margin-top: var(--ui-space-2);
-  color: var(--ui-color-text-muted);
-  font-size: var(--ui-font-size-aux);
-  overflow-wrap: anywhere;
-}
-
 .session-header-actions {
   position: relative;
   min-width: 0;
@@ -703,31 +692,6 @@ select:not(.ui-select):hover {
   flex: 0 1 auto;
   flex-wrap: wrap;
   gap: var(--ui-space-2);
-}
-
-.session-connection {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--ui-space-2);
-  font-size: var(--ui-font-size-aux);
-}
-
-.session-connection::before {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--ui-color-text-muted);
-  content: "";
-}
-
-.session-connection--success::before {
-  background: var(--ui-color-success);
-}
-.session-connection--warning::before {
-  background: var(--ui-color-warning);
-}
-.session-connection--danger::before {
-  background: var(--ui-color-danger);
 }
 
 .turn-status__row {

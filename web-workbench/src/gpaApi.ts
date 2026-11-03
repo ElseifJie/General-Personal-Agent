@@ -97,7 +97,7 @@ export interface ArtifactRef {
 export interface TaskView {
   taskId: string;
   conversationId: string;
-  status: "queued" | "running" | "completed" | "failed" | "cancelled";
+  status: "queued" | "running" | "completed" | "partial" | "failed" | "cancelled";
   progress: number;
   summary: string;
   executor: string;
@@ -491,6 +491,7 @@ export function taskStatusLabel(status: string | null | undefined): string {
     queued: "排队中",
     running: "执行中",
     completed: "已完成",
+    partial: "部分完成",
     failed: "失败",
     cancelled: "已取消",
   };

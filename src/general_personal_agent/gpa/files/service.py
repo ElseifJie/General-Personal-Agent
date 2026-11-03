@@ -150,6 +150,7 @@ class FileService:
                 size=size,
                 storage_ref=storage_ref,
                 meta={"purpose": purpose},
+                file_id=file_id,
             )
         except asyncpg.UniqueViolationError:
             existing = await self.store.find_by_hash(tenant_id, app_user_id, digest)

@@ -1,21 +1,9 @@
-import {
-  CheckCircle2,
-  Circle,
-  CircleAlert,
-  CircleStop,
-  LoaderCircle,
-  Package,
-} from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Package } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { NewMessages } from "../components/NewMessages";
-import {
-  emitConversationsChanged,
-  formatTime,
-  gpaApi,
-  isAuthError,
-} from "../gpaApi";
+import { emitConversationsChanged, gpaApi, isAuthError } from "../gpaApi";
 import { Alert, Spinner } from "../ui/index";
 import { ArtifactRail } from "./ArtifactRail";
 import { ConversationActions } from "./ConversationActions";
@@ -33,7 +21,10 @@ export function TextInteractionPage({
   const { conversationId } = useParams();
   if (conversationId) {
     return (
+      // Remount per conversation so the rail, the artifact selection and the
+      // "user already chose" flags never carry over to another transcript.
       <ConversationPage
+        key={conversationId}
         conversationId={conversationId}
         onAuthRequired={onAuthRequired}
       />
@@ -149,12 +140,10 @@ function ConversationPage({
     () => deriveTasksAndArtifacts(conversation.items),
     [conversation.items],
   );
-  const [railOpen, setRailOpen] = useState(
-    () =>
-      linkedArtifactId !== null ||
-      typeof window === "undefined" ||
-      window.innerWidth >= 1360,
-  );
+  // Closed by default: the empty artifacts panel used to shove the transcript
+  // around on every wide screen. A linked artifact still opens it directly.
+  const [railOpen, setRailOpen] = useState(() => linkedArtifactId !== null);
+  const railTouched = useRef(false);
   const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(
     linkedArtifactId,
   );
@@ -168,58 +157,30 @@ function ConversationPage({
   }, [linkedArtifactId]);
 
   const title = conversation.conversation?.title || "文本交互";
-  const channelLabel = "文本";
   const artifactCount = Math.max(
     conversation.conversation?.artifactCount ?? 0,
     artifacts.length,
   );
+  const closeRail = () => {
+    railTouched.current = true;
+    setRailOpen(false);
+  };
+  useEffect(() => {
+    // Once the conversation is known to have artifacts, show the panel the
+    // way the old always-open default did — unless the reader already
+    // dismissed it or the viewport is too narrow for a docked panel.
+    if (railTouched.current || artifactCount === 0) return;
+    if (typeof window === "undefined" || window.innerWidth < 1360) return;
+    setRailOpen(true);
+  }, [artifactCount]);
   const latestArtifact = artifacts[artifacts.length - 1] ?? null;
   const activeArtifact =
     artifacts.find((artifact) => artifact.artifactId === selectedArtifactId) ??
     latestArtifact;
   const running = conversation.runningTurnId !== null;
-  const lastTurn = conversation.turns[conversation.turns.length - 1] ?? null;
-  const status = running
-    ? { key: "running", label: "本轮进行中", icon: LoaderCircle }
-    : !lastTurn
-      ? { key: "idle", label: "待开始", icon: Circle }
-      : lastTurn.status === "failed"
-        ? { key: "failed", label: "本轮失败", icon: CircleAlert }
-        : lastTurn.status === "cancelled"
-          ? { key: "cancelled", label: "本轮已停止", icon: CircleStop }
-          : { key: "done", label: "本轮完成", icon: CheckCircle2 };
-  const StatusIcon = status.icon;
   const revision = `${conversation.items.length}:${
     Object.keys(conversation.streaming).length
   }`;
-
-  const meta = (
-    <>
-      <span className={`gpa-round-status gpa-round-status--${status.key}`}>
-        <StatusIcon
-          size={12}
-          aria-hidden="true"
-          className={status.key === "running" ? "spin" : undefined}
-        />
-        {status.label}
-      </span>
-      <span
-        className={`session-connection${
-          conversation.connected
-            ? " session-connection--success"
-            : " session-connection--warning"
-        }`}
-        title={conversation.connected ? "SSE 已连接" : "SSE 重连中"}
-      >
-        {conversation.connected ? "已连接" : "重连中"}
-      </span>
-      <span className="gpa-header__meta-divider" aria-hidden="true" />
-      <span>{channelLabel}</span>
-      {conversation.conversation ? (
-        <span>更新于 {formatTime(conversation.conversation.updatedAt)}</span>
-      ) : null}
-    </>
-  );
 
   return (
     <>
@@ -229,7 +190,6 @@ function ConversationPage({
             mode="text"
             conversationId={conversationId}
             title={title}
-            meta={meta}
             modeSwitchFirst
             actions={
               <ConversationActions
@@ -238,7 +198,10 @@ function ConversationPage({
                 turns={conversation.turns}
                 rail={{
                   open: railOpen,
-                  onToggle: () => setRailOpen((open) => !open),
+                  onToggle: () => {
+                    railTouched.current = true;
+                    setRailOpen((open) => !open);
+                  },
                   label: "产物",
                   icon: <Package size={14} aria-hidden="true" />,
                   count: artifactCount,
@@ -300,6 +263,7 @@ function ConversationPage({
                       streaming={conversation.streaming}
                       runningTurnId={conversation.runningTurnId}
                       onArtifactSelect={(artifactId) => {
+                        railTouched.current = true;
                         setSelectedArtifactId(artifactId);
                         setRailOpen(true);
                       }}
@@ -309,6 +273,12 @@ function ConversationPage({
               </div>
             </NewMessages>
           </div>
+
+          {!conversation.connected ? (
+            <p className="gpa-stream-status" role="status">
+              与服务器的连接已断开，正在自动重连…
+            </p>
+          ) : null}
 
           <ConversationComposer
             conversationId={conversationId}
@@ -329,7 +299,7 @@ function ConversationPage({
             artifacts={artifacts}
             selectedArtifactId={activeArtifact?.artifactId ?? null}
             onSelectArtifact={setSelectedArtifactId}
-            onClose={() => setRailOpen(false)}
+            onClose={closeRail}
           />
         ) : null}
         {railOpen ? (
@@ -337,7 +307,7 @@ function ConversationPage({
             type="button"
             className="gpa-rail-backdrop"
             aria-label="关闭产物侧栏"
-            onClick={() => setRailOpen(false)}
+            onClick={closeRail}
           />
         ) : null}
       </div>

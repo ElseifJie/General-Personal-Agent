@@ -20,6 +20,40 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
+/** Answer the conversation WS locally so tests only exercise the client. */
+async function mockVoiceSocket(page) {
+  await page.routeWebSocket(/\/ws\/session/, (ws) => {
+    ws.send(JSON.stringify({ type: "ready", conversationId: "mock", sampleRate: 24_000 }));
+    ws.onMessage((message) => {
+      let data;
+      try {
+        data = JSON.parse(String(message));
+      } catch {
+        return;
+      }
+      if (data.type === "audio_end") {
+        ws.send(JSON.stringify({ type: "final", text: "键盘测试", asr_ms: 10 }));
+      }
+    });
+  });
+}
+
+async function openVoicePage(page) {
+  await page.getByRole("button", { name: "语音", exact: true }).click();
+  await expect(page).toHaveURL(/\/interact\/voice\/c_/);
+  const talk = page.getByRole("button", { name: /按住说话/ });
+  await expect(talk).toBeVisible();
+  // The button only enables once the session WS said "ready".
+  await expect(talk).toBeEnabled({ timeout: 15_000 });
+  return talk;
+}
+
+async function blurActiveElement(page) {
+  await page.evaluate(() => {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+  });
+}
+
 test("hold-to-talk streams partial/final, text delta and audio over the conversation WS", async ({
   page,
 }) => {
@@ -74,4 +108,42 @@ test("hold-to-talk streams partial/final, text delta and audio over the conversa
   await expect(rail).toContainText("150ms");
   await expect(rail).toContainText("220ms");
   await expect(page.locator('textarea[aria-label="输入消息"]')).toHaveCount(0);
+});
+
+test("Space and Enter hold-to-talk work without focusing the mic button", async ({ page }) => {
+  await mockVoiceSocket(page);
+  await openVoicePage(page);
+  // Body focus is the state right after navigating into the voice page.
+  await blurActiveElement(page);
+
+  for (const key of ["Space", "Enter"]) {
+    await page.keyboard.down(key);
+    await expect(page.locator(".gpa-talk.is-recording")).toBeVisible();
+    await expect(page.getByText("正在采集麦克风音频")).toBeVisible();
+    await page.keyboard.up(key);
+    await expect(page.locator(".gpa-talk.is-recording")).toHaveCount(0);
+  }
+
+  // A lost keyup (window blur, tab switch) must not leave the mic open.
+  await page.keyboard.down("Space");
+  await expect(page.locator(".gpa-talk.is-recording")).toBeVisible();
+  await page.evaluate(() => window.dispatchEvent(new Event("blur")));
+  await expect(page.locator(".gpa-talk.is-recording")).toHaveCount(0);
+  await page.keyboard.up("Space");
+});
+
+test("Space keeps typing text while a dialog is open instead of recording", async ({
+  page,
+}) => {
+  await mockVoiceSocket(page);
+  await openVoicePage(page);
+
+  await page.getByRole("button", { name: "更多会话操作" }).click();
+  await page.getByRole("menuitem", { name: "重命名会话" }).click();
+  const field = page.getByLabel("会话名称");
+  await expect(field).toBeVisible();
+  await field.fill("语音会话");
+  await field.press("Space");
+  await expect(field).toHaveValue("语音会话 ");
+  await expect(page.locator(".gpa-talk.is-recording")).toHaveCount(0);
 });

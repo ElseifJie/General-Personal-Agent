@@ -37,6 +37,11 @@ KB_RULES = """- 用户要求把附件保存/沉淀到知识库时，调用 `prom
 - 保存成功只代表已进入索引队列，不要声称索引已完成。
 """
 
+KB_READ_RULES = """- `search_knowledge` 返回的 snippet 只是摘要，不是正文：用户问章节内容、步骤、参数、SOP 这类细节时，必须用 `read_knowledge` 打开命中 uri（或 documentUri）读正文，不能只凭 snippet 作答。
+- 分节返回 `contentStatus=thin` 表示该小节只有标题/署名（PDF 封面被切成独立小节的常见结果）：这说明的是这一小节没内容，不是整份文档没索引正文。请改读同一文档 sections 里更大的分节再回答，不要说“知识库只索引到标题和作者”。
+- 只有 `read_knowledge` 也读不到正文（或因索引未完成不可读）时，才能说知识库缺少这部分内容，并请用户补充原文。
+"""
+
 VOICE_INSTRUCTION = """
 当前通道：语音。用户只能听，看不到屏幕。
 - 最多 2 句话，口语化，先给结论；不要 Markdown、列表、表格、链接、emoji、代码块。
@@ -67,11 +72,12 @@ def build_instruction(
     has_search = tool_names is None or "web_search" in tool_names
     has_attachments = tool_names is None or "read_attachment" in tool_names
     has_kb = tool_names is None or "promote_to_kb" in tool_names
+    has_kb_read = tool_names is None or "read_knowledge" in tool_names
     instruction = INSTRUCTION.format(
         today=today or today_label(),
         web_search_rules=WEB_SEARCH_RULES if has_search else "",
         attachment_rules=ATTACHMENT_RULES if has_attachments else "",
-        kb_rules=KB_RULES if has_kb else "",
+        kb_rules=(KB_RULES if has_kb else "") + (KB_READ_RULES if has_kb_read else ""),
     )
     if channel == "voice":
         instruction += VOICE_INSTRUCTION

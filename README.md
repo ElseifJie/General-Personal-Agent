@@ -19,7 +19,7 @@ General Personal Agent（GPA）是一个以 **VeADK Personal Agent** 为主体�
 | 项 | 状态 |
 |---|---|
 | Python 包 | `general_personal_agent` |
-| 数据库 | PostgreSQL；`db/schema.sql` 基线 + `db/migrations/` 增量迁移（当前到 016） |
+| 数据库 | PostgreSQL；`db/schema.sql` 基线 + `db/migrations/` 增量迁移（当前到 018） |
 | 本地后端 | `http://127.0.0.1:8100/` |
 | 代码 | P0–P5 + C2 已落地：GPA-native schema、Conversation API/SSE、ContextManagerPlugin、Task Gateway/MaExecutor、OV 记忆/KB、文件与知识库、React 文本/语音工作台 |
 | 前端 | React 单壳根路径 `/`：`/interact/text`、`/interact/voice`（按住说话/打断）、`/history`、`/tasks/:taskId`（可取消）、`/files`、`/knowledge`、`/context` |
@@ -74,7 +74,7 @@ general-personal-agent/
 ```bash
 cd general-personal-agent
 make install          # uv venv + 依赖
-make db-migrate       # 增量 GPA-native schema（最新 016；legacy 表已由 007 删除）
+make db-migrate       # 增量 GPA-native schema（最新 018；legacy 表已由 007 删除）
 make run              # 127.0.0.1:8100
 ```
 

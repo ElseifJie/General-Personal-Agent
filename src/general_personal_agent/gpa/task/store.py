@@ -257,7 +257,7 @@ class TaskStore:
                 row = await conn.fetchrow("SELECT * FROM task_run WHERE task_id = $1 FOR UPDATE", task_id)
                 if row is None:
                     return None
-                if row["status"] in ("completed", "failed", "cancelled"):
+                if row["status"] in ("completed", "partial", "failed", "cancelled"):
                     return dict(row)
                 updated = await conn.fetchrow(
                     """
@@ -342,6 +342,7 @@ class TaskStore:
                     """
                     SELECT * FROM task_run
                      WHERE status = 'queued' AND executor = $1
+                       AND (next_retry_at IS NULL OR next_retry_at <= now())
                      ORDER BY created_at
                      LIMIT 1
                      FOR UPDATE SKIP LOCKED
@@ -355,7 +356,7 @@ class TaskStore:
                     """
                     UPDATE task_run
                        SET status = 'running', progress = 0.02, summary = '执行中',
-                           owner_id = $2, heartbeat_at = now()
+                           owner_id = $2, heartbeat_at = now(), next_retry_at = NULL
                      WHERE task_id = $1
                      RETURNING *
                     """,
@@ -365,7 +366,10 @@ class TaskStore:
                 attempt = await conn.fetchrow(
                     """
                     INSERT INTO task_attempt (attempt_id, task_id, seq, status)
-                    VALUES ($1, $2, 1, 'running')
+                    VALUES ($1, $2,
+                            (SELECT COALESCE(MAX(seq), 0) + 1
+                               FROM task_attempt WHERE task_id = $2),
+                            'running')
                     RETURNING *
                     """,
                     uuid4(),
@@ -413,6 +417,80 @@ class TaskStore:
             owner_id,
         )
         return row is not None
+
+    async def attempt_count(self, task_id: str) -> int:
+        """How many attempts this task already used (including the running one)."""
+        value = await self.db.pool.fetchval(
+            "SELECT COUNT(*) FROM task_attempt WHERE task_id = $1", task_id
+        )
+        return int(value or 0)
+
+    async def requeue(
+        self,
+        task_id: str,
+        *,
+        owner_id: str,
+        error: dict[str, Any],
+        summary: str = "任务重试排队中",
+        delay_s: float = 0.0,
+    ) -> bool:
+        """Put a running task back in the queue for another attempt.
+
+        Only the worker holding the lease may requeue, and only while the task
+        is still running: a cancelled or finished task is never resurrected.
+        The just-failed attempt is closed so ``claim_next`` opens ``seq + 1``.
+
+        ``executor_ref`` is cleared here: the session it names belongs to the
+        attempt that just failed, and a retry must not salvage files from it.
+        ``delay_s`` pushes ``next_retry_at`` into the future so the same worker
+        cannot immediately claim the task back and burn every retry at once.
+        """
+        async with self.db.pool.acquire() as conn:
+            async with conn.transaction():
+                row = await conn.fetchrow(
+                    """
+                    UPDATE task_run
+                       SET status = 'queued', progress = 0, summary = $3,
+                           error = $4, owner_id = NULL, heartbeat_at = NULL,
+                           executor_ref = NULL,
+                           next_retry_at = CASE
+                               WHEN $5::double precision > 0
+                               THEN now() + make_interval(secs => $5::double precision)
+                               ELSE NULL
+                           END
+                     WHERE task_id = $1 AND status = 'running' AND owner_id = $2
+                     RETURNING task_id
+                    """,
+                    task_id,
+                    owner_id,
+                    summary,
+                    error,
+                    delay_s,
+                )
+                if row is None:
+                    return False
+                await conn.execute(
+                    """
+                    UPDATE task_attempt
+                       SET status = 'failed', error = $2, ended_at = now()
+                     WHERE task_id = $1 AND status = 'running'
+                    """,
+                    task_id,
+                    error,
+                )
+                await self._append_event_conn(
+                    conn,
+                    task_id=task_id,
+                    type="status",
+                    payload={
+                        "taskId": task_id,
+                        "status": "queued",
+                        "progress": 0.0,
+                        "summary": summary,
+                        "error": error,
+                    },
+                )
+                return True
 
     async def finish(
         self,
@@ -462,7 +540,8 @@ class TaskStore:
                      WHERE task_id = $1 AND status = 'running'
                     """,
                     task_id,
-                    "completed" if status == "completed" else status,
+                    # task_attempt 不承载“部分交付”：partial 的执行尝试按失败收尾。
+                    {"completed": "completed", "partial": "failed"}.get(status, status),
                     error,
                 )
                 for artifact in artifacts or []:
@@ -546,7 +625,7 @@ class TaskStore:
                 status="failed",
                 progress=0.0,
                 summary="进程重启，任务中断",
-                error={"code": "UPSTREAM_UNAVAILABLE", "message": "worker heartbeat expired"},
+                error={"code": "WORKER_LOST", "message": "worker heartbeat expired"},
             ):
                 count += 1
         return count

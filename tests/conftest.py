@@ -38,6 +38,8 @@ MIGRATIONS = [
     "db/migrations/014_files.sql",
     "db/migrations/015_reliability_fixes.sql",
     "db/migrations/016_gc_outbox_recovery.sql",
+    "db/migrations/017_task_partial_status.sql",
+    "db/migrations/018_task_retry_backoff.sql",
 ]
 
 

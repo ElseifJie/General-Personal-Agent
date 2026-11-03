@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from general_personal_agent.clients.ma import MAStatusError
 from general_personal_agent.gpa.task.artifacts import ArtifactJanitor
 from general_personal_agent.gpa.task.executor import MaExecutor
 from general_personal_agent.gpa.task.tools import TaskToolState, build_task_tools
@@ -310,3 +311,330 @@ async def test_is_artifact_ignores_staged_inputs_and_meta():
     )
     assert not is_artifact({"filename": "out.jpg_meta.json", "mime_type": "application/json"})
     assert not is_artifact({"filename": "notes.txt", "mime_type": "text/plain"})
+
+
+# ---------------------------------------------------------------------------
+# 预算 / 重试 / 产物抢救（2026-11-03 海报任务误杀事故的回归）
+# ---------------------------------------------------------------------------
+
+
+async def test_poll_budget_extends_idle_window_but_keeps_the_hard_cap():
+    from general_personal_agent.gpa.task.executor import MaTimeout, _PollBudget
+
+    now = [0.0]
+    budget = _PollBudget(100, 10, clock=lambda: now[0])
+
+    now[0] = 9
+    assert budget.check() is None
+    budget.touch()  # 新事件续期
+    now[0] = 15
+    assert budget.check() is None
+
+    now[0] = 25  # 距上次活动 10s
+    stalled = budget.check()
+    assert isinstance(stalled, MaTimeout)
+    assert stalled.reason == "idle"
+
+    now[0] = 110  # 超过总时长护栏
+    capped = budget.check()
+    assert isinstance(capped, MaTimeout)
+    assert capped.reason == "deadline"
+
+
+class SilentMA(FakeMA):
+    """Never reports idle, so only the local budget can stop the run."""
+
+    def __init__(self):
+        super().__init__()
+        self.events = [{"id": "e1", "type": "session.status_running"}]
+
+    async def list_files_all(self, session_id):
+        return []
+
+
+class PosterMA(SilentMA):
+    async def list_files_all(self, session_id):
+        return [
+            {
+                "id": "file_1",
+                "filename": "poster.png",
+                "mime_type": "image/png",
+                "bytes": 128,
+                "description": "/mnt/session/outputs/poster.png",
+                "tos": {
+                    "object_key": "general-personal-agent/task/poster.png",
+                    "bucket": "ma-source-bucket",
+                },
+            }
+        ]
+
+
+def _fast_budget(env, **overrides):
+    values = {
+        "task_idle_timeout_s": 1,
+        "task_timeout_s": 60,
+        "ma_poll_interval_s": 0.5,
+        "task_max_retry": 0,
+        "task_retry_backoff_s": 0,
+        "task_artifact_grace_s": 0,
+        "task_progress_interval_s": 0,
+    }
+    values.update(overrides)
+    return env.settings.model_copy(update=values)
+
+
+@pytest.mark.integration
+async def test_ma_executor_salvages_artifacts_when_budget_expires(gpa_env):
+    """超时也要交付：已产出的文件以 partial 收尾，而不是整单丢弃。"""
+    env = gpa_env
+    conversation = await env.conversations.create(
+        tenant_id=env.tenant, app_user_id=env.user, title="超时抢救", channel="text"
+    )
+    task = await env.tasks.submit(
+        tenant_id=env.tenant,
+        app_user_id=env.user,
+        conversation_id=conversation["conversation_id"],
+        goal="生成一张展会海报",
+        task_type="design_poster",
+        idempotency_key="ma-timeout-salvage",
+    )
+    fake = PosterMA()
+    executor = MaExecutor(_fast_budget(env), env.task_store, fake, tos=FakeTOS())
+    assert await executor.run_once() is True
+
+    view = await env.tasks.get(task["task_id"], env.tenant, env.user)
+    assert view["status"] == "partial"
+    assert view["error"]["code"] == "TASK_TIMEOUT"
+    assert "已回收 1 个" in view["summary"]
+    assert [artifact["name"] for artifact in view["artifacts"]] == ["poster.png"]
+    assert fake.interrupted == ["ma_1"]
+
+    attempt = await env.db.pool.fetchrow(
+        "SELECT status, error FROM task_attempt WHERE task_id = $1", task["task_id"]
+    )
+    assert attempt["status"] == "failed"
+    assert attempt["error"]["code"] == "TASK_TIMEOUT"
+
+
+@pytest.mark.integration
+async def test_ma_executor_timeout_without_outputs_fails_with_timeout_code(gpa_env):
+    env = gpa_env
+    conversation = await env.conversations.create(
+        tenant_id=env.tenant, app_user_id=env.user, title="超时无产物", channel="text"
+    )
+    task = await env.tasks.submit(
+        tenant_id=env.tenant,
+        app_user_id=env.user,
+        conversation_id=conversation["conversation_id"],
+        goal="生成一张海报",
+        task_type="image",
+        idempotency_key="ma-timeout-empty",
+    )
+    executor = MaExecutor(_fast_budget(env), env.task_store, SilentMA(), tos=FakeTOS())
+    assert await executor.run_once() is True
+
+    view = await env.tasks.get(task["task_id"], env.tenant, env.user)
+    assert view["status"] == "failed"
+    assert view["error"]["code"] == "TASK_TIMEOUT"
+    assert view["artifacts"] == []
+
+
+class FlakyMA(FakeMA):
+    """First ``failures`` session creations hit a transient 503."""
+
+    def __init__(self, failures: int = 1):
+        super().__init__()
+        self.failures = failures
+
+    async def create_session(self, *args, **kwargs):
+        if self.failures:
+            self.failures -= 1
+            raise MAStatusError("POST", "/sessions", 503, "upstream unavailable")
+        return await super().create_session(*args, **kwargs)
+
+
+@pytest.mark.integration
+async def test_ma_executor_retries_transient_upstream_errors(gpa_env):
+    env = gpa_env
+    conversation = await env.conversations.create(
+        tenant_id=env.tenant, app_user_id=env.user, title="重试", channel="text"
+    )
+    task = await env.tasks.submit(
+        tenant_id=env.tenant,
+        app_user_id=env.user,
+        conversation_id=conversation["conversation_id"],
+        goal="生成一张海报",
+        task_type="image",
+        idempotency_key="ma-retry-1",
+    )
+    fake = FlakyMA(failures=1)
+    settings = env.settings.model_copy(
+        update={"task_max_retry": 1, "task_retry_backoff_s": 0, "task_artifact_grace_s": 0}
+    )
+    executor = MaExecutor(settings, env.task_store, fake, tos=FakeTOS())
+
+    assert await executor.run_once() is True
+    queued = await env.tasks.get(task["task_id"], env.tenant, env.user)
+    assert queued["status"] == "queued"
+    assert queued["summary"] == "第 2 次尝试排队中"
+    assert queued["error"]["code"] == "UPSTREAM_UNAVAILABLE"
+
+    assert await executor.run_once() is True
+    view = await env.tasks.get(task["task_id"], env.tenant, env.user)
+    assert view["status"] == "completed"
+    attempts = await env.db.pool.fetch(
+        "SELECT seq, status FROM task_attempt WHERE task_id = $1 ORDER BY seq",
+        task["task_id"],
+    )
+    assert [row["seq"] for row in attempts] == [1, 2]
+    assert attempts[0]["status"] == "failed"
+    assert attempts[1]["status"] == "completed"
+
+
+async def test_retryable_failures_are_only_transient_upstream_errors():
+    from general_personal_agent.gpa.task.executor import MaSessionFailed, MaTimeout
+
+    def classify(exc):
+        return MaExecutor._classify_failure(None, exc)
+
+    assert classify(MAStatusError("GET", "/events", 429, "rate limited"))[2] is True
+    assert classify(MAStatusError("GET", "/events", 503, "down"))[2] is True
+    assert classify(MAStatusError("GET", "/events", 400, "bad request"))[2] is False
+    assert classify(MaSessionFailed("session failed"))[2] is True
+    assert classify(MaTimeout("idle", "stalled"))[2] is False
+    assert classify(ValueError("boom"))[2] is False
+
+
+class BrokenEventsMA(SilentMA):
+    """The event endpoint is down; every poll raises 503 and no outputs exist."""
+
+    async def fetch_events_all(self, session_id):
+        raise MAStatusError("GET", "/events", 503, "down")
+
+
+@pytest.mark.integration
+async def test_ma_executor_gives_up_after_consecutive_poll_failures(gpa_env):
+    env = gpa_env
+    conversation = await env.conversations.create(
+        tenant_id=env.tenant, app_user_id=env.user, title="轮询失败", channel="text"
+    )
+    task = await env.tasks.submit(
+        tenant_id=env.tenant,
+        app_user_id=env.user,
+        conversation_id=conversation["conversation_id"],
+        goal="生成一张海报",
+        task_type="image",
+        idempotency_key="ma-poll-1",
+    )
+    executor = MaExecutor(
+        _fast_budget(env, task_idle_timeout_s=60), env.task_store, BrokenEventsMA(), tos=FakeTOS()
+    )
+
+    assert await executor.run_once() is True
+    view = await env.tasks.get(task["task_id"], env.tenant, env.user)
+    assert view["status"] == "failed"
+    assert view["error"]["code"] == "UPSTREAM_UNAVAILABLE"
+
+
+@pytest.mark.integration
+async def test_requeue_clears_the_dead_session_and_honours_the_backoff(gpa_env):
+    env = gpa_env
+    conversation = await env.conversations.create(
+        tenant_id=env.tenant, app_user_id=env.user, title="退避", channel="text"
+    )
+    task = await env.tasks.submit(
+        tenant_id=env.tenant,
+        app_user_id=env.user,
+        conversation_id=conversation["conversation_id"],
+        goal="生成一张海报",
+        task_type="image",
+        idempotency_key="ma-backoff-1",
+    )
+    claimed = await env.task_store.claim_next("ma", owner_id="worker_a")
+    assert claimed["task"]["task_id"] == task["task_id"]
+    await env.task_store.attach_attempt(
+        task["task_id"], claimed["attempt"]["attempt_id"], "sess_old"
+    )
+    assert await env.task_store.requeue(
+        task["task_id"],
+        owner_id="worker_a",
+        error={"code": "UPSTREAM_UNAVAILABLE", "message": "MA HTTP 503"},
+        delay_s=60,
+    )
+
+    row = await env.db.pool.fetchrow(
+        "SELECT status, executor_ref, next_retry_at FROM task_run WHERE task_id = $1",
+        task["task_id"],
+    )
+    assert row["status"] == "queued"
+    # The failed attempt's session must not be reused by the retry.
+    assert row["executor_ref"] is None
+    assert row["next_retry_at"] is not None
+
+    # The window blocks an immediate reclaim, so retries cannot burn in seconds.
+    assert await env.task_store.claim_next("ma", owner_id="worker_b") is None
+
+    await env.db.pool.execute(
+        "UPDATE task_run SET next_retry_at = now() - interval '1 second' WHERE task_id = $1",
+        task["task_id"],
+    )
+    reclaimed = await env.task_store.claim_next("ma", owner_id="worker_b")
+    assert reclaimed["task"]["task_id"] == task["task_id"]
+    assert reclaimed["attempt"]["seq"] == 2
+
+
+class ProgressMA(FakeMA):
+    """Reports one tool call, then idle; enough to project a progress event."""
+
+    def __init__(self):
+        super().__init__()
+        self.polls = 0
+
+    async def fetch_events_all(self, session_id):
+        self.polls += 1
+        events = [
+            {"id": "e0", "type": "session.status_running"},
+            {"id": "e1", "type": "agent.tool_use", "name": "bash"},
+        ]
+        if self.polls >= 2:
+            events.append({"id": "e2", "type": "session.status_idle"})
+            events.append(
+                {
+                    "id": "e3",
+                    "type": "agent.message",
+                    "content": [{"type": "text", "text": "海报已生成"}],
+                }
+            )
+        return events
+
+
+@pytest.mark.integration
+async def test_ma_executor_projects_progress_events(gpa_env):
+    env = gpa_env
+    conversation = await env.conversations.create(
+        tenant_id=env.tenant, app_user_id=env.user, title="进度", channel="text"
+    )
+    task = await env.tasks.submit(
+        tenant_id=env.tenant,
+        app_user_id=env.user,
+        conversation_id=conversation["conversation_id"],
+        goal="生成一张海报",
+        task_type="image",
+        idempotency_key="ma-progress-1",
+    )
+    executor = MaExecutor(
+        _fast_budget(env, task_idle_timeout_s=30), env.task_store, ProgressMA(), tos=FakeTOS()
+    )
+    assert await executor.run_once() is True
+
+    rows = await env.db.pool.fetch(
+        "SELECT payload FROM task_event WHERE task_id = $1 AND type = 'progress' ORDER BY seq",
+        task["task_id"],
+    )
+    assert rows
+    payload = rows[0]["payload"]
+    assert payload["status"] == "running"
+    assert payload["summary"] == "执行中 · 第 1 步 · bash"
+    assert payload["progress"] > 0.02
+    view = await env.tasks.get(task["task_id"], env.tenant, env.user)
+    assert view["status"] == "completed"

@@ -15,7 +15,7 @@ from general_personal_agent.gpa.task.store import TaskStore
 
 logger = get_logger(__name__)
 
-_STATUS_TYPES = {"status", "progress", "completed", "failed", "cancelled"}
+_STATUS_TYPES = {"status", "progress", "completed", "partial", "failed", "cancelled"}
 
 
 class TaskEventInbox:

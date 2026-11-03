@@ -66,21 +66,14 @@ export function InteractionModeSwitch({
 export function InteractionHeader({
   mode,
   conversationId,
-  eyebrow = null,
   title,
-  meta,
-  subtitle,
   actions,
   rail,
   modeSwitchFirst = false,
 }: {
   mode: Channel;
   conversationId?: string | null;
-  eyebrow?: string | null;
   title: string;
-  /** Structured meta line rendered under the title (agent, status, time). */
-  meta?: ReactNode;
-  subtitle?: string;
   actions?: ReactNode;
   rail?: { open: boolean; count: number; onToggle: () => void } | null;
   /** Put the mode switch before the page actions instead of after them. */
@@ -89,13 +82,9 @@ export function InteractionHeader({
   return (
     <header className="gpa-header session-header">
       <div className="gpa-header__copy session-heading">
-        {eyebrow ? <p className="gpa-header__eyebrow">{eyebrow}</p> : null}
-        <h1 className="gpa-header__title">{title}</h1>
-        {meta ? (
-          <div className="session-meta gpa-header__meta">{meta}</div>
-        ) : subtitle ? (
-          <p className="session-meta gpa-header__meta">{subtitle}</p>
-        ) : null}
+        <h1 className="gpa-header__title" title={title}>
+          {title}
+        </h1>
       </div>
       <div className="gpa-header__actions session-header-actions">
         {modeSwitchFirst ? (

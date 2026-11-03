@@ -29,14 +29,6 @@
   min-width: 0;
 }
 
-.gpa-header__eyebrow {
-  margin: 0 0 var(--ui-space-1);
-  color: var(--ui-color-text-muted);
-  font-size: var(--ui-font-size-aux);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
 .gpa-header__title {
   margin: 0;
   font-size: var(--ui-font-size-page);

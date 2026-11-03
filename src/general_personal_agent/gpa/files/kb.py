@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -36,6 +37,21 @@ _IMPORT_TERMINAL_STATUSES = {
 
 ClientFactory = Callable[[str, str], Awaitable[OpenVikingClient]]
 
+#: OV's per-document parse output: one markdown file per detected section.
+_GENERATED_FILES = {".abstract.md", ".overview.md"}
+_SECTION_SUFFIX = ".md"
+
+#: Size at which a short section stops being suspicious.  Length alone is not
+#: enough: a two-line paragraph that ends with a full stop is content, while a
+#: slide-deck cover (``title`` + ``author · role``) is an artifact even though
+#: both are < 250 chars.  See :func:`_heading_only`.
+_TITLE_BLOCK_MAX_CHARS = 120
+_MIN_CONTENT_CHARS = 24
+
+#: Hard ceiling for one ``read_uri`` page so a tool call cannot flood context.
+READ_MAX_CHARS = 8000
+READ_DEFAULT_CHARS = 4000
+
 
 def normalize_kb_uri(raw: str) -> str:
     """Normalize a viking URI and reject traversal / query tricks."""
@@ -56,6 +72,87 @@ def normalize_kb_uri(raw: str) -> str:
 
 def uri_within(uri: str, root: str) -> bool:
     return uri == root or uri.startswith(root.rstrip("/") + "/")
+
+
+def _owner_doc(uri: str, docs: list[dict]) -> dict | None:
+    """Deepest indexed document whose resource folder contains ``uri``.
+
+    OV expands an imported file into ``<target_uri>/<slug>/<section>.md``, so a
+    retrieved URI is usually a *section*, not the document row.  The longest
+    matching folder wins when a document is nested under another one.
+    """
+    best: dict | None = None
+    best_len = -1
+    for doc in docs:
+        root = str(doc.get("target_uri") or "").rstrip("/")
+        if root and uri_within(uri, root) and len(root) > best_len:
+            best, best_len = doc, len(root)
+    return best
+
+
+def _is_section(uri: str) -> bool:
+    name = uri.rstrip("/").rsplit("/", 1)[-1]
+    return name.endswith(_SECTION_SUFFIX) and name not in _GENERATED_FILES
+
+
+def _section_title(uri: str) -> str:
+    name = uri.rstrip("/").rsplit("/", 1)[-1]
+    return name[: -len(_SECTION_SUFFIX)] if name.endswith(_SECTION_SUFFIX) else name
+
+
+def _readable_chars(text: str) -> int:
+    """Body length with whitespace removed (headings are short; pages are not)."""
+    return len(re.sub(r"\s+", "", text or ""))
+
+
+#: Prose ends with punctuation; a cover (``标题`` + ``作者 · 职务``) does not.
+_SENTENCE_END = re.compile(r"[。！？!?]|[.]$", re.MULTILINE)
+_BULLET = re.compile(r"^\s*(?:[-*•·]|\d+[.)])\s+")
+
+
+def _heading_only(body: str) -> bool:
+    """True when a parsed section is a heading/byline shell, not prose.
+
+    A slide deck's cover page becomes its own section holding the title and the
+    author line; ranking it first is what made the agent report "indexed with
+    the title and author only".  Length is a weak signal on its own — a report
+    can have perfectly valid two-line paragraphs — so short bodies are only
+    called thin when they also look like a title block: at most three lines,
+    no bullets, and no sentence-ending punctuation.
+    """
+    text = (body or "").strip()
+    if not text:
+        return True
+    lines = [line for line in text.splitlines() if line.strip()]
+    # A bullet list is content even when it is short and unpunctuated.
+    if any(_BULLET.match(line) for line in lines):
+        return False
+    readable = _readable_chars(text)
+    if readable < _MIN_CONTENT_CHARS:
+        return True
+    if readable > _TITLE_BLOCK_MAX_CHARS:
+        return False
+    if len(lines) > 3:
+        return False
+    return not _SENTENCE_END.search(text)
+
+
+#: OV embeds every parsed page as ``![image](viking://…)``; the agent cannot
+#: render those URIs, so they only burn context.  ``<KBImage>`` wrappers do
+#: carry OCR text inside the tag, so the wrapper is unwrapped, not dropped.
+_IMAGE_LINK = re.compile(r"!\[[^\]]*\]\(viking://[^)]*\)")
+_KB_IMAGE = re.compile(r"<KBImage\b[^>]*>(.*?)</KBImage>", re.DOTALL)
+
+
+def _clean_markdown(text: str) -> str:
+    """Drop unrenderable image links, keep OCR text, collapse blank runs."""
+    cleaned = _KB_IMAGE.sub(lambda match: match.group(1), text or "")
+    lines = [
+        line for line in cleaned.splitlines() if not _IMAGE_LINK.fullmatch(line.strip())
+    ]
+    cleaned = _IMAGE_LINK.sub("", "\n".join(lines))
+    cleaned = re.sub(r"[ \t]+\n", "\n", cleaned)
+    return re.sub(r"\n{3,}", "\n\n", cleaned).strip()
 
 
 def import_outcome_unknown(exc: BaseException) -> bool:
@@ -982,6 +1079,194 @@ class KbService:
             return await client.read(uri)
         except Exception as exc:  # noqa: BLE001
             raise GpaError("NOT_FOUND", "knowledge content not found") from exc
+
+    # ------------------------------------------------------------- agent read
+    async def scope_for_uri(self, *, tenant_id: str, app_user_id: str, uri: str) -> str:
+        """``shared`` or ``private`` for a ``viking://`` URI the agent asked about."""
+        uri = normalize_kb_uri(uri)
+        if self.identity_service is None:
+            raise GpaError("UPSTREAM_UNAVAILABLE", "identity unavailable")
+        identity = await self._identity("private", app_user_id, tenant_id)
+        layout = self._layout(identity)
+        if uri_within(uri, layout.shared_root):
+            return "shared"
+        if uri_within(uri, layout.resources):
+            return "private"
+        raise GpaError("NOT_FOUND", "knowledge content not found")
+
+    async def read_uri(
+        self,
+        *,
+        tenant_id: str,
+        app_user_id: str,
+        scope: str,
+        uri: str,
+        offset: int = 0,
+        limit: int = READ_DEFAULT_CHARS,
+    ) -> dict:
+        """Read what a retrieval hit actually points at.
+
+        Retrieval only returns OV's ``abstract`` for a hit, which is a summary.
+        This is the body: a document URI (an imported file folder) returns its
+        section outline, a section URI returns paginated markdown.  A section
+        that is only a heading (failed/partial PDF parse artifact) is reported
+        as ``contentStatus="thin"`` together with its siblings, so the agent
+        reads the real body instead of concluding the document has none.
+        """
+        uri = normalize_kb_uri(uri).rstrip("/")
+        identity = await self._identity(scope, app_user_id, tenant_id)
+        root = self._root(identity, scope).rstrip("/")
+        if not uri_within(uri, root):
+            raise GpaError("NOT_FOUND", "knowledge content not found")
+        docs = await self.store.list_kb_documents(tenant_id, app_user_id, scope)
+        doc = _owner_doc(uri, docs)
+        if doc is not None:
+            if doc.get("deleted_at") is not None:
+                raise GpaError("NOT_FOUND", "knowledge content not found")
+            if scope == "private" and doc.get("app_user_id") not in {None, app_user_id}:
+                raise GpaError("NOT_FOUND", "knowledge content not found")
+            status = str(doc.get("index_status") or "")
+            if status != "ready":
+                return {
+                    "uri": uri,
+                    "kind": "section" if _is_section(uri) else "document",
+                    "status": status or "unknown",
+                    "document": self._doc_ref(doc, scope),
+                    "message": f"文档仍在索引中（{status or 'unknown'}），正文暂不可读；先不要断言内容缺失。",
+                }
+        if not await self.guard.is_allowed(tenant_id, scope, uri):
+            raise GpaError("NOT_FOUND", "knowledge content not found")
+        client, _ = await self._client(scope, app_user_id, tenant_id, write=False)
+        if doc is not None and uri == str(doc.get("target_uri") or "").rstrip("/"):
+            return await self._document_view(client, doc, uri, scope)
+        return await self._section_view(
+            client, doc, uri, scope, offset=offset, limit=limit, root=root
+        )
+
+    @staticmethod
+    def _doc_ref(doc: dict, scope: str) -> dict:
+        root = str(doc.get("target_uri") or "").rstrip("/")
+        return {
+            "docId": doc.get("doc_id"),
+            "uri": root,
+            "title": doc.get("title") or doc.get("file_name") or root.rsplit("/", 1)[-1],
+            "mime": doc.get("file_mime"),
+            "bytes": doc.get("file_bytes"),
+            "scope": scope,
+            "status": doc.get("index_status"),
+        }
+
+    async def _sections(
+        self, client: OpenVikingClient, folder: str, *, depth: int = 0
+    ) -> list[dict]:
+        """Readable markdown sections OV produced for one imported resource.
+
+        OV nests the parse output one level down: ``<target_uri>/<slug>/*.md``.
+        A folder that only holds that wrapper directory is descended into once;
+        deeper descent is refused so a KB root can never be enumerated here.
+        """
+        try:
+            items = await client.ls(folder)
+        except Exception as exc:  # noqa: BLE001 - outline is best effort
+            logger.debug("kb ls %s failed: %s", folder, exc)
+            return []
+        sections: list[dict] = []
+        nested: list[str] = []
+        for item in items or []:
+            section_uri = str(item.get("uri") or "").rstrip("/")
+            if not section_uri:
+                continue
+            if item.get("isDir"):
+                nested.append(section_uri)
+                continue
+            if not _is_section(section_uri):
+                continue
+            sections.append(
+                {
+                    "uri": section_uri,
+                    "title": _section_title(section_uri),
+                    "bytes": item.get("size"),
+                }
+            )
+        if not sections and depth == 0:
+            for child in nested[:3]:
+                sections.extend(await self._sections(client, child, depth=1))
+        sections.sort(key=lambda row: -int(row.get("bytes") or 0))
+        return sections
+
+    async def _document_view(
+        self, client: OpenVikingClient, doc: dict, uri: str, scope: str
+    ) -> dict:
+        try:
+            abstract = str(await client.abstract(uri) or "")
+        except Exception:  # noqa: BLE001 - abstract is optional context
+            abstract = ""
+        sections = await self._sections(client, uri)
+        return {
+            "uri": uri,
+            "kind": "document",
+            "document": self._doc_ref(doc, scope),
+            "abstract": abstract[:1200],
+            "sections": sections,
+            "instruction": (
+                "这是文档目录，不是正文：用 read_knowledge 打开 sections 里的分节 uri 读取正文。"
+            ),
+        }
+
+    async def _section_view(
+        self,
+        client: OpenVikingClient,
+        doc: dict | None,
+        uri: str,
+        scope: str,
+        *,
+        offset: int,
+        limit: int,
+        root: str,
+    ) -> dict:
+        try:
+            raw = str(await client.read(uri) or "")
+        except Exception as exc:  # noqa: BLE001
+            raise GpaError("NOT_FOUND", "knowledge content not found") from exc
+        # Normalize before paginating so offsets/short-total describe what the
+        # agent actually receives (raw OV text is mostly viking:// image links).
+        body = _clean_markdown(raw)
+        total = len(body)
+        size = max(1, min(int(limit or READ_DEFAULT_CHARS), READ_MAX_CHARS))
+        start = min(max(0, int(offset or 0)), total)
+        end = min(total, start + size)
+        payload: dict = {
+            "uri": uri,
+            "kind": "section",
+            "title": _section_title(uri),
+            "text": body[start:end],
+            "offset": start,
+            "nextOffset": end,
+            "truncated": end < total,
+            "totalChars": total,
+            "document": self._doc_ref(doc, scope) if doc is not None else None,
+        }
+        if _heading_only(body):
+            folder = (
+                str(doc.get("target_uri") or "").rstrip("/")
+                if doc is not None
+                else uri.rsplit("/", 1)[0]
+            )
+            sections = (
+                await self._sections(client, folder)
+                if folder != root and uri_within(folder, root)
+                else []
+            )
+            payload["contentStatus"] = "thin"
+            payload["sections"] = [row for row in sections if row["uri"] != uri]
+            payload["hint"] = (
+                "该分节正文只有标题/署名一类的封面文字（PDF 排版被切成独立小节的常见结果），"
+                "不代表整份文档没有内容：请读取同一文档其他分节（sections 中 bytes 较大的那些）"
+                "再回答；不要据此说“知识库只索引到标题与作者”。"
+            )
+        else:
+            payload["contentStatus"] = "ok"
+        return payload
 
     async def download(
         self, doc_id: str, *, tenant_id: str, app_user_id: str, role: str

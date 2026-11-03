@@ -1,7 +1,7 @@
-import { Package, X } from "lucide-react";
+import { Package } from "lucide-react";
 
-import { IconButton } from "../ui/index";
 import { ArtifactPanel } from "./ArtifactPanel";
+import { RailPane } from "./RailPane";
 import type { DerivedArtifact } from "./derive";
 
 export function ArtifactRail({
@@ -16,25 +16,19 @@ export function ArtifactRail({
   onClose: () => void;
 }) {
   return (
-    <aside id="gpa-artifact-rail" className="gpa-rail-pane" aria-label="会话产物">
-      <header className="gpa-rail-pane__head">
-        <h2 className="gpa-rail-pane__title">
-          <Package size={15} aria-hidden="true" />
-          产物
-          <span className="gpa-rail-section__count">{artifacts.length}</span>
-        </h2>
-        <IconButton label="收起侧栏" size="small" onClick={onClose}>
-          <X size={15} aria-hidden="true" />
-        </IconButton>
-      </header>
-
-      <div className="gpa-rail-pane__scroll">
-        <ArtifactPanel
-          artifacts={artifacts}
-          selectedArtifactId={selectedArtifactId}
-          onSelectArtifact={onSelectArtifact}
-        />
-      </div>
-    </aside>
+    <RailPane
+      id="gpa-artifact-rail"
+      label="会话产物"
+      title="产物"
+      icon={<Package size={15} aria-hidden="true" />}
+      count={artifacts.length}
+      onClose={onClose}
+    >
+      <ArtifactPanel
+        artifacts={artifacts}
+        selectedArtifactId={selectedArtifactId}
+        onSelectArtifact={onSelectArtifact}
+      />
+    </RailPane>
   );
 }

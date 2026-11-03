@@ -140,7 +140,7 @@ jobs:
           WB_E2E_PIN: "1234"
         run: |
           npx playwright install --with-deps chromium
-          npx playwright test e2e/gpa.spec.mjs e2e/voice.spec.mjs
+          npx playwright test e2e/gpa.spec.mjs e2e/voice.spec.mjs e2e/rail.spec.mjs
       - name: Upload app log on failure
         if: failure()
         uses: actions/upload-artifact@v4

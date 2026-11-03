@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import Any
 
 from general_personal_agent.clients.search import SearchService
+from general_personal_agent.gpa.errors import GpaError
 from general_personal_agent.gpa.logging import get_logger
 
 logger = get_logger(__name__)
@@ -114,7 +115,7 @@ def build_attachment_tools(state, files) -> list:
 
 
 def build_kb_tools(state, kb) -> list:
-    """Let the agent persist an attachment to the KB without a sandbox task."""
+    """KB tools: persist an attachment, and read the body behind a retrieval hit."""
 
     async def promote_to_kb(
         file_id: str,
@@ -147,4 +148,30 @@ def build_kb_tools(state, kb) -> list:
             "instruction": "文件已进入知识库索引队列；告诉用户已保存，不要声称已完成向量索引。",
         }
 
-    return [promote_to_kb]
+    async def read_knowledge(uri: str, offset: int = 0, limit: int = 4000) -> dict[str, Any]:
+        """读取知识库正文：uri 取自 search_knowledge 结果的 uri 或 documentUri。
+
+        传文档目录 uri 返回分节清单；传分节 uri 返回正文（offset 为字符偏移，单次最多 8000 字符）。
+        """
+        clean = (uri or "").strip()
+        if not clean:
+            return {"error": "VALIDATION_ERROR", "message": "uri 不能为空"}
+        try:
+            scope = await kb.scope_for_uri(
+                tenant_id=state.tenant_id, app_user_id=state.app_user_id, uri=clean
+            )
+            return await kb.read_uri(
+                tenant_id=state.tenant_id,
+                app_user_id=state.app_user_id,
+                scope=scope,
+                uri=clean,
+                offset=max(0, int(offset or 0)),
+                limit=min(max(1, int(limit or 4000)), 8000),
+            )
+        except GpaError as exc:
+            return {"error": exc.code, "uri": clean, "message": exc.message}
+        except Exception as exc:  # noqa: BLE001 - tool errors go back to the model
+            logger.warning("read_knowledge failed (%s): %s", clean, exc)
+            return {"error": "READ_FAILED", "uri": clean, "message": str(exc)[:300]}
+
+    return [promote_to_kb, read_knowledge]

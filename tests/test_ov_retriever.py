@@ -170,3 +170,75 @@ async def test_search_memory_returns_typed_hits():
     hits = await _retriever(fake).search_memory("颜色", "alice", "demo", limit=2)
     assert hits[0]["memoryTypeLabel"] == "偏好"
     assert len(hits) == 2
+
+
+class _SectionClient:
+    """Fake OV client returning one per-section hit inside an imported PDF."""
+
+    async def search(self, query, target_uri=None, limit=8, context_type=None):
+        return {
+            "resources": [
+                {
+                    "uri": "viking://resources/deck.pdf/deck/chapter_1.md",
+                    "abstract": "本文档仅呈现了标题与作者署名信息。",
+                    "score": 0.85,
+                }
+            ]
+        }
+
+    async def close(self):
+        return None
+
+
+class _GuardStore:
+    async def list_kb_documents(self, tenant_id, app_user_id, scope, **kwargs):
+        if scope != "shared":
+            return []
+        return [
+            {
+                "doc_id": "doc_1",
+                "target_uri": "viking://resources/deck.pdf",
+                "title": "deck.pdf",
+                "index_status": "ready",
+            }
+        ]
+
+    async def list_tombstones(self, tenant_id, scope):
+        return []
+
+    async def get_kb_by_uris(self, tenant_id, uris):
+        return {}
+
+    async def list_open_invalidations(self, tenant_id, scope):
+        return []
+
+
+async def test_search_knowledge_points_section_hits_at_their_document():
+    """The agent must be able to widen a heading-only section (see read_knowledge)."""
+    from general_personal_agent.gpa.files.guard import KbReadGuard
+
+    fake = _SectionClient()
+    settings = SimpleNamespace(
+        ov_url="http://ov.test",
+        ov_timeout_s=1.0,
+        ov_search_top_k=8,
+        ov_skills_enabled=True,
+        ov_personal_kb_indexes="",
+        ov_shared_kb_categories="",
+    )
+    retriever = GpaContextRetriever(settings, _IdentityService())
+    retriever.guard = KbReadGuard(_GuardStore())
+
+    async def client(app_user_id, identity):
+        return fake
+
+    retriever._client = client
+
+    hits = await retriever.search_knowledge("基于TRAE的实践", "alice", "demo", scope="shared")
+
+    assert len(hits) == 1
+    assert hits[0]["documentUri"] == "viking://resources/deck.pdf"
+    assert hits[0]["documentTitle"] == "deck.pdf"
+    assert hits[0]["section"] is True
+    # The summary stays available, but it is no longer the only thing on offer.
+    assert hits[0]["snippet"].startswith("本文档仅呈现")

@@ -96,8 +96,11 @@ class FileStore:
         size: int,
         storage_ref: str | None,
         meta: dict[str, Any] | None = None,
+        file_id: str | None = None,
     ) -> dict:
-        file_id = new_file_id()
+        # Callers that already derived an object key from a file id must pass it
+        # back, otherwise ``storage_ref`` points at a different id than the row.
+        file_id = file_id or new_file_id()
         row = await self.db.pool.fetchrow(
             """
             INSERT INTO file_object

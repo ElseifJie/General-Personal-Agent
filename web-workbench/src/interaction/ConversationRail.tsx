@@ -1,8 +1,8 @@
-import { LayoutList, Package, X } from "lucide-react";
+import { LayoutList, Package } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { IconButton } from "../ui/index";
 import { ArtifactPanel } from "./ArtifactPanel";
+import { RailPane } from "./RailPane";
 import type { DerivedArtifact } from "./derive";
 
 /**
@@ -25,37 +25,27 @@ export function ConversationRail({
   onClose: () => void;
 }) {
   return (
-    <aside
+    <RailPane
       id="gpa-detail-rail"
-      className="gpa-rail-pane"
-      aria-label="会话详情"
+      label="会话详情"
+      title="详情"
+      icon={<LayoutList size={15} aria-hidden="true" />}
+      onClose={onClose}
     >
-      <header className="gpa-rail-pane__head">
-        <h2 className="gpa-rail-pane__title">
-          <LayoutList size={15} aria-hidden="true" />
-          详情
-        </h2>
-        <IconButton label="收起侧栏" size="small" onClick={onClose}>
-          <X size={15} aria-hidden="true" />
-        </IconButton>
-      </header>
+      {leading}
 
-      <div className="gpa-rail-pane__scroll">
-        {leading}
-
-        <section className="gpa-rail-section" aria-labelledby="gpa-rail-artifacts">
-          <h3 className="gpa-rail-section__title" id="gpa-rail-artifacts">
-            <Package size={14} aria-hidden="true" />
-            产物
-            <span className="gpa-rail-section__count">{artifacts.length}</span>
-          </h3>
-          <ArtifactPanel
-            artifacts={artifacts}
-            selectedArtifactId={selectedArtifactId}
-            onSelectArtifact={onSelectArtifact}
-          />
-        </section>
-      </div>
-    </aside>
+      <section className="gpa-rail-section" aria-labelledby="gpa-rail-artifacts">
+        <h3 className="gpa-rail-section__title" id="gpa-rail-artifacts">
+          <Package size={14} aria-hidden="true" />
+          产物
+          <span className="gpa-rail-section__count">{artifacts.length}</span>
+        </h3>
+        <ArtifactPanel
+          artifacts={artifacts}
+          selectedArtifactId={selectedArtifactId}
+          onSelectArtifact={onSelectArtifact}
+        />
+      </section>
+    </RailPane>
   );
 }

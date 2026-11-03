@@ -83,30 +83,19 @@
   flex: 1 1 16rem;
 }
 
-.gpa-header__eyebrow {
-  margin: 0 0 var(--ui-space-1);
-  color: var(--ui-color-text-faint);
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
+/* One fixed line keeps the header (and the actions beside it) aligned; the
+   full title stays reachable through the native tooltip and the rename dialog. */
 .gpa-header__title {
+  min-width: 0;
   margin: 0;
+  overflow: hidden;
   color: var(--ui-color-text);
   font-size: 1.75rem;
   font-weight: 600;
   line-height: 1.35;
   letter-spacing: -0.01em;
-  overflow-wrap: anywhere;
-}
-
-.gpa-header__meta {
-  margin-top: var(--ui-space-2);
-  gap: var(--ui-space-1) var(--ui-space-2);
-  color: var(--ui-color-text-muted);
-  font-size: var(--ui-font-size-aux);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .gpa-agent-tag {
@@ -115,46 +104,6 @@
   gap: 0.35rem;
   color: var(--ui-color-text-secondary);
   font-weight: 500;
-}
-
-.gpa-round-status {
-  display: inline-flex;
-  height: 1.45rem;
-  align-items: center;
-  gap: 0.3rem;
-  padding: 0 0.5rem;
-  border: 1px solid var(--ui-color-border);
-  border-radius: 999px;
-  color: var(--ui-color-text-muted);
-  background: var(--ui-color-surface);
-  font-size: 0.75rem;
-  font-weight: 500;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-.gpa-round-status--done {
-  border-color: color-mix(in srgb, var(--ui-color-success) 26%, var(--ui-color-border));
-  color: var(--ui-color-success);
-  background: var(--ui-color-success-subtle);
-}
-
-.gpa-round-status--running {
-  border-color: color-mix(in srgb, var(--ui-color-accent) 30%, var(--ui-color-border));
-  color: var(--ui-color-accent-interactive);
-  background: var(--ui-color-accent-subtle);
-}
-
-.gpa-round-status--failed {
-  border-color: color-mix(in srgb, var(--ui-color-danger) 26%, var(--ui-color-border));
-  color: var(--ui-color-danger);
-  background: var(--ui-color-danger-subtle);
-}
-
-.gpa-round-status--cancelled {
-  border-color: color-mix(in srgb, var(--ui-color-warning) 30%, var(--ui-color-border));
-  color: var(--ui-color-warning);
-  background: var(--ui-color-warning-subtle);
 }
 
 .gpa-header .session-header-actions {
@@ -234,12 +183,6 @@
 
 .gpa-chat .gpa-composer__footer {
   padding-top: 0.15rem;
-}
-
-.gpa-header__meta-divider {
-  width: 1px;
-  height: 0.75rem;
-  background: var(--ui-color-border);
 }
 
 .gpa-header__actions {
@@ -453,18 +396,18 @@
 
 /* What GPA answered: a quiet avatar and plain, readable text. */
 .gpa-assistant {
+  --gpa-assistant-avatar: 1.75rem;
   display: grid;
   min-width: 0;
-  grid-template-columns: 1.75rem minmax(0, 1fr);
+  grid-template-columns: var(--gpa-assistant-avatar) minmax(0, 1fr);
   gap: var(--ui-space-3);
   align-items: start;
 }
 
 .gpa-avatar {
   display: grid;
-  width: 1.75rem;
-  height: 1.75rem;
-  margin-top: 0.1rem;
+  width: var(--gpa-assistant-avatar);
+  height: var(--gpa-assistant-avatar);
   place-items: center;
   border: 1px solid var(--ui-color-border);
   border-radius: 50%;
@@ -476,12 +419,14 @@
   min-width: 0;
 }
 
+/* The name row is exactly as tall as the avatar, so "GPA"/its timestamp and
+   the round mark share one vertical centre instead of drifting apart. */
 .gpa-assistant__head {
   display: flex;
+  min-height: var(--gpa-assistant-avatar);
   align-items: center;
   gap: var(--ui-space-2);
-  min-height: 1.1rem;
-  margin: 0.15rem 0 var(--ui-space-2);
+  margin: 0 0 var(--ui-space-2);
   color: var(--ui-color-text-muted);
   font-size: var(--ui-font-size-aux);
 }
@@ -999,13 +944,37 @@ button.gpa-link {
 
 /* ------------------------------------------------------------------ rail pane */
 .gpa-rail-pane {
+  position: relative;
   display: flex;
-  width: 21rem;
+  width: var(--gpa-rail-width, 21rem);
   min-width: 0;
   min-height: 0;
   flex-direction: column;
   border-left: 1px solid var(--ui-color-border);
   background: var(--ui-color-surface-subtle);
+}
+
+/* A widened grab strip straddling the divider: easy to hit, invisible until
+   hovered, and keyboard-operable with the arrow keys like the left rail. */
+.gpa-rail-pane__resizer {
+  position: absolute;
+  z-index: 5;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  width: 8px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.gpa-rail-pane__resizer:hover,
+.gpa-rail-pane__resizer.is-resizing {
+  background: var(--ui-color-accent-subtle);
+}
+
+.gpa-rail-pane__resizer:focus-visible {
+  outline: 2px solid var(--ui-focus-ring);
+  outline-offset: -2px;
 }
 
 .gpa-rail-pane__head {
@@ -1403,6 +1372,15 @@ button.gpa-link {
 /* ------------------------------------------------------------------ voice dock */
 .gpa-voice-page .session-body {
   gap: var(--ui-space-2);
+}
+
+/* The header no longer carries a connection chip; when the live link drops this
+   line is the only thing that explains a disabled mic or a silent send button. */
+.gpa-stream-status {
+  margin: 0;
+  color: var(--ui-color-warning);
+  font-size: var(--ui-font-size-aux);
+  text-align: center;
 }
 
 .gpa-voice-dock {

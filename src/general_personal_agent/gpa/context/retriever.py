@@ -245,6 +245,39 @@ class GpaContextRetriever:
         allowed = await self.guard.filter_uris(tenant_id, scope, [hit["uri"] for hit in hits])
         return [hit for hit in hits if hit["uri"] in allowed]
 
+    async def _attach_documents(self, hits: list[dict], tenant_id: str, app_user_id: str) -> None:
+        """Point each section hit at the document folder it belongs to.
+
+        OV expands an imported file into a folder of per-section markdown files,
+        so a hit is usually one *section*.  Section URIs hide the folder above
+        them, and without ``documentUri`` the agent cannot widen a hit that turns
+        out to be a heading-only fragment (``read_knowledge`` needs the folder to
+        list its siblings).
+        """
+        store = getattr(self.guard, "store", None)
+        if not hits or store is None:
+            return
+        docs: list[dict] = []
+        for scope in ("shared", "private"):
+            try:
+                docs.extend(await store.list_kb_documents(tenant_id, app_user_id, scope))
+            except Exception as exc:  # noqa: BLE001 - enrichment must never fail a search
+                logger.debug("gpa kb document lookup degraded (%s): %s", scope, exc)
+        roots = sorted(
+            ((str(doc.get("target_uri") or "").rstrip("/"), doc) for doc in docs if doc.get("target_uri")),
+            key=lambda pair: -len(pair[0]),
+        )
+        if not roots:
+            return
+        for hit in hits:
+            uri = str(hit.get("uri") or "").rstrip("/")
+            for root, doc in roots:
+                if uri == root or uri.startswith(root + "/"):
+                    hit["documentUri"] = root
+                    hit["documentTitle"] = doc.get("title") or ""
+                    hit["section"] = uri != root
+                    break
+
     async def search_memory(
         self, query: str, app_user_id: str, tenant_id: str, limit: int = 5
     ) -> list[dict[str, Any]]:
@@ -271,6 +304,7 @@ class GpaContextRetriever:
                 return []
             result = await client.search(query, targets, self.settings.ov_search_top_k, ["resource"])
             hits = _kb_hits(result, layout, limit=6)
+            await self._attach_documents(hits, tenant_id, app_user_id)
             if self.guard is not None:
                 allowed_personal = await self.guard.filter_uris(
                     tenant_id, "private", [h["uri"] for h in hits if h.get("scope") == "personal"]

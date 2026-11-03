@@ -1,13 +1,5 @@
-import {
-  AudioLines,
-  CheckCircle2,
-  Circle,
-  CircleAlert,
-  CircleStop,
-  LayoutList,
-  LoaderCircle,
-} from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { AudioLines, LayoutList } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { NewMessages } from "../components/NewMessages";
@@ -37,7 +29,10 @@ export function VoiceInteractionPage({
   const { conversationId } = useParams();
   if (conversationId) {
     return (
+      // Remount per conversation so the rail state and the selected artifact
+      // never carry over to another voice session.
       <VoiceConversation
+        key={conversationId}
         conversationId={conversationId}
         onAuthRequired={onAuthRequired}
       />
@@ -153,9 +148,10 @@ function VoiceConversation({
       void conversation.refresh();
     },
   });
-  const [railOpen, setRailOpen] = useState(
-    () => typeof window === "undefined" || window.innerWidth >= 1360,
-  );
+  // Closed by default, exactly like the text page: the detail rail (voice
+  // pipeline + artifacts) only comes up when there is something to show.
+  const [railOpen, setRailOpen] = useState(false);
+  const railTouched = useRef(false);
   const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(
     null,
   );
@@ -175,6 +171,19 @@ function VoiceConversation({
     return [...map.values()];
   }, [derived.artifacts, voice.artifacts]);
 
+  const hasArtifacts = artifacts.length > 0;
+  const closeRail = () => {
+    railTouched.current = true;
+    setRailOpen(false);
+  };
+  useEffect(() => {
+    // Auto-open once the conversation turns out to produce artifacts; a manual
+    // dismissal wins, and narrow screens keep it as a drawer.
+    if (railTouched.current || !hasArtifacts) return;
+    if (typeof window === "undefined" || window.innerWidth < 1360) return;
+    setRailOpen(true);
+  }, [hasArtifacts]);
+
   const latestArtifact = artifacts[artifacts.length - 1] ?? null;
   const activeArtifact =
     artifacts.find((artifact) => artifact.artifactId === selectedArtifactId) ??
@@ -183,7 +192,6 @@ function VoiceConversation({
   // A draft voice conversation only becomes visible once its first turn lands;
   // its empty state must not claim the turn joins an earlier conversation.
   const isNewConversation = Boolean(conversation.conversation?.isDraft);
-  const channelLabel = "语音";
   const updatedLabel = conversation.conversation
     ? formatTime(conversation.conversation.updatedAt)
     : "";
@@ -200,46 +208,7 @@ function VoiceConversation({
     voice.status === "thinking" ||
     voice.status === "speaking";
   const running = conversation.runningTurnId !== null || voiceActive;
-  const lastTurn = conversation.turns[conversation.turns.length - 1] ?? null;
-  const status = running
-    ? { key: "running", label: "本轮进行中", icon: LoaderCircle }
-    : !lastTurn
-      ? { key: "idle", label: "待开始", icon: Circle }
-      : lastTurn.status === "failed"
-        ? { key: "failed", label: "本轮失败", icon: CircleAlert }
-        : lastTurn.status === "cancelled"
-          ? { key: "cancelled", label: "本轮已停止", icon: CircleStop }
-          : { key: "done", label: "本轮完成", icon: CheckCircle2 };
-  const StatusIcon = status.icon;
   const revision = `${conversation.items.length}:${Object.keys(conversation.streaming).length}:${voice.partialText.length}:${voice.assistantText.length}`;
-
-  const meta = (
-    <>
-      <span className={`gpa-round-status gpa-round-status--${status.key}`}>
-        <StatusIcon
-          size={12}
-          aria-hidden="true"
-          className={status.key === "running" ? "spin" : undefined}
-        />
-        {status.label}
-      </span>
-      <span
-        className={`session-connection${
-          voice.connected
-            ? " session-connection--success"
-            : " session-connection--warning"
-        }`}
-        title={voice.connected ? "语音 WebSocket 已连接" : "语音 WebSocket 重连中"}
-      >
-        {voice.connected ? "已连接" : "重连中"}
-      </span>
-      <span className="gpa-header__meta-divider" aria-hidden="true" />
-      <span>{channelLabel}</span>
-      {conversation.conversation ? (
-        <span>更新于 {formatTime(conversation.conversation.updatedAt)}</span>
-      ) : null}
-    </>
-  );
 
   return (
     <div className="session-workspace gpa-workbench gpa-page--voice">
@@ -248,7 +217,6 @@ function VoiceConversation({
           mode="voice"
           conversationId={conversationId}
           title={title}
-          meta={meta}
           modeSwitchFirst
           actions={
             <ConversationActions
@@ -345,6 +313,7 @@ function VoiceConversation({
                         : undefined
                     }
                     onArtifactSelect={(artifactId) => {
+                      railTouched.current = true;
                       setSelectedArtifactId(artifactId);
                       setRailOpen(true);
                     }}
@@ -356,6 +325,11 @@ function VoiceConversation({
         </div>
 
         <div className="gpa-voice-dock">
+          {!voice.connected && !voice.error ? (
+            <p className="gpa-stream-status" role="status">
+              语音连接已断开，正在重连…
+            </p>
+          ) : null}
           <VoiceComposer
             status={voice.status}
             connected={voice.connected}
@@ -387,7 +361,7 @@ function VoiceConversation({
               />
             </section>
           }
-          onClose={() => setRailOpen(false)}
+          onClose={closeRail}
         />
       ) : null}
       {railOpen ? (
@@ -395,7 +369,7 @@ function VoiceConversation({
           type="button"
           className="gpa-rail-backdrop"
           aria-label="关闭详情侧栏"
-          onClick={() => setRailOpen(false)}
+          onClick={closeRail}
         />
       ) : null}
     </div>

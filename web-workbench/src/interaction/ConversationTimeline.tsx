@@ -26,7 +26,7 @@ import { Alert, Badge, Spinner } from "../ui/index";
 function statusTone(status: string | null | undefined) {
   if (status === "completed" || status === "ok") return "success" as const;
   if (status === "failed" || status === "error") return "danger" as const;
-  if (status === "cancelled") return "warning" as const;
+  if (status === "partial" || status === "cancelled") return "warning" as const;
   if (status === "running" || status === "queued") return "info" as const;
   return "neutral" as const;
 }
@@ -36,6 +36,7 @@ function statusLabel(status: string | null | undefined) {
     queued: "排队中",
     running: "执行中",
     completed: "已完成",
+    partial: "部分完成",
     failed: "失败",
     cancelled: "已取消",
     cancelling: "取消中",
@@ -167,7 +168,7 @@ function TaskEvent({ item }: { item: TimelineItem }) {
       <span className="gpa-event__icon" aria-hidden="true">
         {status === "running" || status === "queued" ? (
           <Loader2 size={15} className="spin" />
-        ) : status === "failed" ? (
+        ) : status === "failed" || status === "partial" ? (
           <CircleAlert size={15} />
         ) : (
           <CircleCheck size={15} />
