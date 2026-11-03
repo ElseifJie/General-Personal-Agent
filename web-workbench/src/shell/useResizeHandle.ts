@@ -67,6 +67,12 @@ export function useResizeHandle({
   function onPointerMove(event: PointerEvent<HTMLElement>) {
     const start = startRef.current;
     if (!start) return;
+    // A missed pointerup (window blur, OS drag, capture lost) must not leave
+    // the rail glued to the cursor: no pressed button means the drag is over.
+    if (event.buttons === 0) {
+      endResize(event);
+      return;
+    }
     const delta = (event.clientX - start.x) * direction;
     onChange(clampRound(start.width + delta, min, max));
   }

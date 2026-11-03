@@ -53,22 +53,19 @@ db:
 	psql "$(DB)" -f db/migrations/018_task_retry_backoff.sql
 
 db-migrate:
-	psql "$(DB)" -f db/migrations/003_wb.sql
-	psql "$(DB)" -f db/migrations/004_voice_workbench.sql
-	psql "$(DB)" -f db/migrations/005_gpa_core.sql
-	psql "$(DB)" -f db/migrations/006_gpa_context.sql
-	psql "$(DB)" -f db/migrations/007_drop_legacy.sql
-	psql "$(DB)" -f db/migrations/008_identity_convergence.sql
-	psql "$(DB)" -f db/migrations/009_artifact_retention.sql
-	psql "$(DB)" -f db/migrations/010_service_token_revocation.sql
-	psql "$(DB)" -f db/migrations/011_task_idempotency_scope.sql
-	psql "$(DB)" -f db/migrations/012_conversation_management.sql
-	psql "$(DB)" -f db/migrations/013_voice_session_model.sql
-	psql "$(DB)" -f db/migrations/014_files.sql
-	psql "$(DB)" -f db/migrations/015_reliability_fixes.sql
-	psql "$(DB)" -f db/migrations/016_gc_outbox_recovery.sql
-	psql "$(DB)" -f db/migrations/017_task_partial_status.sql
-	psql "$(DB)" -f db/migrations/018_task_retry_backoff.sql
+	@set -eu; \
+	applied=$$(psql "$(DB)" -Atc "select version from schema_migrations" 2>/dev/null || true); \
+	for f in db/migrations/*.sql; do \
+		v=$$(basename "$$f" .sql); \
+		case "$$v" in 002_v05) continue;; esac; \
+		case "$$v" in \
+			003_wb|004_voice_workbench) \
+				if printf '%s\n' "$$applied" | grep -qx "005_gpa_core"; then continue; fi;; \
+		esac; \
+		if printf '%s\n' "$$applied" | grep -qx "$$v"; then continue; fi; \
+		echo "applying $$f"; \
+		psql "$(DB)" -v ON_ERROR_STOP=1 -f "$$f"; \
+	done
 
 build-wb:
 	cd web-workbench && npm ci && npm run build

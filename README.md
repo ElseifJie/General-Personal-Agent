@@ -87,16 +87,58 @@ GPA_AGENT_MODE=stub make run
 后端 API：
 
 ```text
-POST /api/conversations
-GET  /api/conversations
-GET  /api/conversations/{id}
-GET  /api/conversations/{id}/timeline
-GET  /api/conversations/{id}/context-traces
-WS   /ws/session?conversationId=      # 16k PCM 上行 / 24k PCM 下行
-POST /api/conversations/{id}/messages      # 202 + eventsUrl
-GET  /api/conversations/{id}/events        # SSE
-POST /api/conversations/{id}/stop
-GET  /api/tasks/{id}
+# 认证
+POST   /api/auth/login                 # PIN 登录，Set-Cookie
+POST   /api/auth/logout
+GET    /api/auth/me
+
+# 会话 / 时间线 / 实时事件
+POST   /api/conversations
+GET    /api/conversations
+GET    /api/conversations/{id}
+PATCH  /api/conversations/{id}
+DELETE /api/conversations/{id}
+GET    /api/conversations/{id}/timeline
+GET    /api/conversations/{id}/context-traces
+POST   /api/conversations/{id}/messages      # 202 + eventsUrl
+GET    /api/conversations/{id}/events        # SSE
+POST   /api/conversations/{id}/stop
+GET    /api/conversations/{id}/files
+POST   /api/conversations/{id}/files
+DELETE /api/conversations/{id}/files/{fileId}
+WS     /ws/session?conversationId=           # 16k PCM 上行 / 24k PCM 下行
+
+# 任务与产物
+GET    /api/tasks/{id}
+POST   /api/tasks/{id}/cancel
+GET    /api/tasks/{id}/artifacts
+GET    /api/tasks/{id}/artifacts/{artifactId}/download
+
+# 文件
+POST   /api/files                      # 上传
+GET    /api/files
+GET    /api/files/{fileId}
+GET    /api/files/{fileId}/download
+POST   /api/files/{fileId}/reparse
+POST   /api/files/{fileId}/promote
+DELETE /api/files/objects/{fileId}
+
+# 知识库 / 记忆 / 上下文
+GET    /api/kb/entries
+GET    /api/kb/content
+DELETE /api/kb/entries
+GET    /api/kb/documents/{docId}/download
+POST   /api/kb/documents/{docId}/reindex
+POST   /api/kb/documents/{docId}/retry-delete
+GET    /api/memories
+GET    /api/memories/content
+GET    /api/context/tree
+GET    /api/context/content
+
+# 内部网关（service token）
+POST   /api/internal/tasks
+GET    /api/internal/tasks/{id}
+POST   /api/internal/tasks/{id}/cancel
 ```
 
 P1 冒烟（不调用真实模型）：
