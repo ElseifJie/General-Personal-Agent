@@ -6,4 +6,8 @@ ALTER TABLE task_run DROP CONSTRAINT IF EXISTS task_run_status_check;
 ALTER TABLE task_run ADD CONSTRAINT task_run_status_check
   CHECK (status IN ('queued', 'running', 'completed', 'partial', 'failed', 'cancelled'));
 
+INSERT INTO schema_migrations (version, description)
+VALUES ('017_task_partial_status', 'Partial task status for salvageable deliverables')
+ON CONFLICT (version) DO NOTHING;
+
 COMMIT;

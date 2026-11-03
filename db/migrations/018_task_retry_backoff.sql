@@ -12,4 +12,8 @@ CREATE INDEX IF NOT EXISTS task_run_ready_idx
   ON task_run (executor, created_at)
   WHERE status = 'queued';
 
+INSERT INTO schema_migrations (version, description)
+VALUES ('018_task_retry_backoff', 'Retry backoff column and queued-task index')
+ON CONFLICT (version) DO NOTHING;
+
 COMMIT;
