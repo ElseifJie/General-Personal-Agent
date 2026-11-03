@@ -278,13 +278,6 @@ export function isAuthError(error: unknown): boolean {
   return error instanceof GpaApiError && error.isAuthRequired;
 }
 
-export function newSubmissionId(): string {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
-  }
-  return `gpa-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-}
-
 export function emitConversationsChanged(): void {
   window.dispatchEvent(new Event("gpa:conversations-changed"));
 }

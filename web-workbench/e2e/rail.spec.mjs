@@ -98,8 +98,8 @@ test("the header keeps the title on one line, beside the actions", async ({ page
   const conversationId = await createDraft(page, title);
   try {
     await page.goto(`/interact/text/${conversationId}`);
-    // The status/connection/updated line is gone from the text header.
-    await expect(page.locator(".gpa-header__meta")).toHaveCount(0);
+    // The header holds the title only: no status/connection/updated meta line.
+    await expect(page.locator(".gpa-header__copy")).toHaveText(title);
 
     const heading = page.getByRole("heading", { name: title });
     await expect(heading).toHaveAttribute("title", title);

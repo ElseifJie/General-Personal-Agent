@@ -1,5 +1,3 @@
-import type { ShellLayoutResult } from "./layout";
-
 export interface PanelDescriptor {
   id: string;
   type: string;
@@ -115,17 +113,4 @@ export function saveShellState(
   } catch {
     // Storage can be unavailable in private mode; layout then stays in memory.
   }
-}
-
-export function applyLayoutToState(
-  state: ShellState,
-  layout: ShellLayoutResult,
-): ShellState {
-  return {
-    ...state,
-    leftWidth: layout.leftWidth,
-    rightWidth: layout.rightWidth,
-    leftCollapsed: layout.leftMode === "collapsed",
-    rightOpen: layout.rightMode !== "closed",
-  };
 }
