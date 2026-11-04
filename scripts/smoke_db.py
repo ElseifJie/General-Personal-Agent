@@ -6,7 +6,7 @@ import asyncpg
 import redis.asyncio as redis
 
 from general_personal_agent.settings import Settings
-from scripts._common import check, info, run
+from scripts._common import check, info, run, warn
 
 
 async def main(settings: Settings) -> bool:
@@ -28,7 +28,12 @@ async def main(settings: Settings) -> bool:
     finally:
         await conn.close()
 
-    client = redis.from_url(settings.redis_url)
+    if not settings.gpa_redis_url:
+        # Redis backs the distributed rate limiter only; empty means in-process.
+        warn("redis", "GPA_REDIS_URL 为空，使用进程内实现；跳过 Redis 检查")
+        return ok
+
+    client = redis.from_url(settings.gpa_redis_url)
     try:
         ok &= check(bool(await client.ping()), "redis ping")
         await client.set("general-personal-agent:smoke", "ok", ex=60)

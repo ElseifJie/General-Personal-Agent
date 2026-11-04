@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import time
+
 import pytest
 
 from general_personal_agent.clients.ma import MAStatusError
@@ -369,6 +371,53 @@ class PosterMA(SilentMA):
         ]
 
 
+class LatePosterMA(PosterMA):
+    """Registers the poster only on the second file listing."""
+
+    def __init__(self):
+        super().__init__()
+        self.calls = 0
+
+    async def list_files_all(self, session_id):
+        self.calls += 1
+        if self.calls == 1:
+            return []
+        return await super().list_files_all(session_id)
+
+
+async def test_artifact_grace_waits_for_late_registration():
+    from types import SimpleNamespace
+
+    executor = MaExecutor.__new__(MaExecutor)
+    executor.settings = SimpleNamespace(
+        task_artifact_grace_s=1, task_artifact_ttl_days=7, ma_tos_bucket=""
+    )
+    executor.ma = LatePosterMA()
+    executor.tos = None
+
+    started = time.monotonic()
+    artifacts = await executor._artifacts_with_grace("task_1", "session_1", [])
+    elapsed = time.monotonic() - started
+
+    assert [item["name"] for item in artifacts] == ["poster.png"]
+    assert executor.ma.calls >= 2
+    assert elapsed >= 0.5
+
+
+async def test_artifact_grace_zero_returns_without_waiting():
+    from types import SimpleNamespace
+
+    executor = MaExecutor.__new__(MaExecutor)
+    executor.settings = SimpleNamespace(
+        task_artifact_grace_s=0, task_artifact_ttl_days=7, ma_tos_bucket=""
+    )
+    executor.ma = LatePosterMA()
+    executor.tos = None
+
+    assert await executor._artifacts_with_grace("task_1", "session_1", []) == []
+    assert executor.ma.calls == 1
+
+
 def _fast_budget(env, **overrides):
     values = {
         "task_idle_timeout_s": 1,
@@ -503,6 +552,21 @@ async def test_retryable_failures_are_only_transient_upstream_errors():
     assert classify(MaSessionFailed("session failed"))[2] is True
     assert classify(MaTimeout("idle", "stalled"))[2] is False
     assert classify(ValueError("boom"))[2] is False
+
+
+async def test_retry_delay_is_exponential_and_capped():
+    from types import SimpleNamespace
+
+    settings = SimpleNamespace(task_retry_backoff_s=30, task_retry_backoff_max_s=100)
+    executor = SimpleNamespace(settings=settings)
+
+    assert MaExecutor._retry_delay(executor, 1) == 30
+    assert MaExecutor._retry_delay(executor, 2) == 60
+    assert MaExecutor._retry_delay(executor, 3) == 100
+    assert MaExecutor._retry_delay(executor, 5) == 100
+
+    settings.task_retry_backoff_s = 0
+    assert MaExecutor._retry_delay(executor, 2) == 0
 
 
 class BrokenEventsMA(SilentMA):

@@ -74,7 +74,8 @@ general-personal-agent/
 ```bash
 cd general-personal-agent
 make install          # uv venv + 依赖
-make db-migrate       # 增量 GPA-native schema（最新 018；legacy 表已由 007 删除）
+make db               # 全新空库：schema 基线 + 002，再应用 003..018
+                      # 已有库升级改用 make db-migrate（按 schema_migrations 判重）
 make run              # 127.0.0.1:8100
 ```
 

@@ -43,7 +43,9 @@ export function VoiceComposer({
           disabled
             ? status === "error"
               ? "语音链路异常：先点“重连语音”，或切换到文本交互"
-              : "语音正在连接，连上后按住即可说话"
+              : !connected
+                ? "语音连接已断开，正在重连…"
+                : "语音正在连接，连上后按住即可说话"
             : "按住说话，松开结束（也可以按住空格或回车）"
         }
         disabled={disabled}

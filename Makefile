@@ -33,24 +33,14 @@ fmt:
 	$(PY) -m ruff check --fix src tests scripts
 
 db:
-	psql "$(DB)" -f db/schema.sql
-	psql "$(DB)" -f db/migrations/002_v05.sql
-	psql "$(DB)" -f db/migrations/003_wb.sql
-	psql "$(DB)" -f db/migrations/004_voice_workbench.sql
-	psql "$(DB)" -f db/migrations/005_gpa_core.sql
-	psql "$(DB)" -f db/migrations/006_gpa_context.sql
-	psql "$(DB)" -f db/migrations/007_drop_legacy.sql
-	psql "$(DB)" -f db/migrations/008_identity_convergence.sql
-	psql "$(DB)" -f db/migrations/009_artifact_retention.sql
-	psql "$(DB)" -f db/migrations/010_service_token_revocation.sql
-	psql "$(DB)" -f db/migrations/011_task_idempotency_scope.sql
-	psql "$(DB)" -f db/migrations/012_conversation_management.sql
-	psql "$(DB)" -f db/migrations/013_voice_session_model.sql
-	psql "$(DB)" -f db/migrations/014_files.sql
-	psql "$(DB)" -f db/migrations/015_reliability_fixes.sql
-	psql "$(DB)" -f db/migrations/016_gc_outbox_recovery.sql
-	psql "$(DB)" -f db/migrations/017_task_partial_status.sql
-	psql "$(DB)" -f db/migrations/018_task_retry_backoff.sql
+	@set -eu; \
+	if [ -n "$$(psql "$(DB)" -Atc "select to_regclass('public.schema_migrations')" 2>/dev/null || true)" ]; then \
+		echo "database already bootstrapped; use 'make db-migrate' to apply pending migrations"; \
+		exit 1; \
+	fi; \
+	psql "$(DB)" -v ON_ERROR_STOP=1 -f db/schema.sql; \
+	psql "$(DB)" -v ON_ERROR_STOP=1 -f db/migrations/002_v05.sql; \
+	$(MAKE) db-migrate DB="$(DB)"
 
 db-migrate:
 	@set -eu; \
