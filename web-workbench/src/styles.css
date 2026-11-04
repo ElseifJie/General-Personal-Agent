@@ -1211,9 +1211,9 @@ select:not(.ui-select):hover {
 
 /* ---------------------------------------------------------------------------
  * general-personal-agent additions
- * The ported MAWorker styles cover the shell, timeline, composer, files,
- * history and settings. These rules fill the few new surfaces this product
- * adds: the session artifact strip, the flat memory browser, a compact
+ * Base styles cover the shell, timeline, composer, files, history and
+ * settings. These rules fill the few new surfaces this product adds:
+ * the session artifact strip, the flat memory browser, a compact
  * automation list, the capability grid and login footnotes.
  * ------------------------------------------------------------------------- */
 

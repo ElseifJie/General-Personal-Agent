@@ -86,10 +86,6 @@ export function SettingsPage({
             <dt>数据边界</dt>
             <dd>会话/材料/产物按登录用户隔离；产物下载走同源流式代理</dd>
           </div>
-          <div>
-            <dt>界面基线</dt>
-            <dd>移植自 MAWorker（MIT，commit 44c9efb），按本工程契约适配</dd>
-          </div>
         </dl>
         <p className="settings-note">
           <ShieldCheck size={15} aria-hidden="true" />

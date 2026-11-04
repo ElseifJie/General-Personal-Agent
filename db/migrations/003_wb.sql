@@ -129,7 +129,7 @@ CREATE TABLE IF NOT EXISTS ma_session_task_group (
 );
 
 -- ---------------------------------------------------------------------------
--- wb_submission：submissionId 幂等回执（canonical request_hash 照搬 MAWorker）
+-- wb_submission：submissionId 幂等回执（按 canonical request_hash 判重）
 -- turn_id：受理即建 turn（input_event_id 提交后回填）；重放返回同一 turnId。
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS wb_submission (

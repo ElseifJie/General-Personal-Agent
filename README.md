@@ -500,4 +500,4 @@ make mcp-server                  # 127.0.0.1:8201/mcp
 
 ## 11. License
 
-见仓库根目录 `LICENSE`。`web-workbench/` 内第三方组件归属见 `NOTICE` 与 `THIRD_PARTY_LICENSE_MAWORKER`。
+本项目（含 `web-workbench/` 前端）整体采用 MIT 许可证，全文见仓库根目录 `LICENSE`。
