@@ -86,11 +86,11 @@ class Settings(BaseSettings):
     context_token_ratio: float = 0.75  # 中文估算：1 字 ≈ 0.75 token（S7 校准前默认）
     context_trace_ttl_days: int = 7
 
-    # ---- A1 稳定会话 / STM ----
+    # ---- 稳定会话 / STM ----
     agent_stm_backend: str = "postgresql"  # local / postgresql
     agent_stm_schema: str = "agent_stm"
 
-    # ---- A4 Outbox ----
+    # ---- Outbox ----
     outbox_interval_s: float = 1.0
     outbox_batch_size: int = 50
     outbox_max_attempts: int = 8
@@ -98,7 +98,7 @@ class Settings(BaseSettings):
     memory_enabled: bool = True
     memory_commit_every: int = 2  # N turns; writer commits every N*2 messages
 
-    # ---- GPA-native conversation/agent core (P1) ----
+    # ---- GPA-native conversation/agent core ----
     gpa_agent_mode: str = "auto"  # auto | veadk | stub
     gpa_context_manager: bool = True
     gpa_warmup_enabled: bool = True
@@ -186,6 +186,9 @@ class Settings(BaseSettings):
     a2a_enabled: bool = False
     a2a_agent_url: str = ""
     a2a_token: str = ""
+    # Comma-separated hosts the outbound A2A executor may call; empty means
+    # "any host whose resolved addresses are all public". Set this in production.
+    a2a_allowed_hosts: str = ""
     a2a_timeout_s: int = 300
     a2a_poll_interval_s: float = 2.0
 

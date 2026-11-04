@@ -1,4 +1,4 @@
-"""AgentTransport contract and the in-process implementation (ADR-005).
+"""AgentTransport contract and the in-process implementation.
 
 Only ``InProcessTransport`` is in the MVP. A2A keeps the same envelope but is
 deferred until a second agent/process exists.

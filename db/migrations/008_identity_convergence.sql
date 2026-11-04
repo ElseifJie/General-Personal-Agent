@@ -1,4 +1,4 @@
--- P0: converge app_user/ov_identity on (tenant_id, app_user_id).
+-- Converge app_user/ov_identity on (tenant_id, app_user_id).
 BEGIN;
 
 CREATE UNIQUE INDEX IF NOT EXISTS app_user_tenant_user_key

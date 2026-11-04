@@ -172,7 +172,7 @@ class MAClient:
         return events
 
     async def stream_events(self, session_id: str, idle_timeout_s: float = 60.0) -> AsyncIterator[dict]:
-        """Optional SSE stream (``/events/stream``); P0-05 verified, off by default.
+        """Optional SSE stream (``/events/stream``); verified, off by default.
 
         Yields raw flat events like ``fetch_events_all``. ``idle_timeout_s``:
         无数据（无心跳）超时抛 ``httpx.ReadTimeout`` —— 空会话不会无限挂起。

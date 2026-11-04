@@ -1,4 +1,4 @@
--- Voice/Text session model (ADR-019).
+-- Voice/Text session model.
 --
 -- A conversation is created as a draft so an abandoned voice/text entry does
 -- not leave an empty row in the sidebar. The first turn promotes it and may

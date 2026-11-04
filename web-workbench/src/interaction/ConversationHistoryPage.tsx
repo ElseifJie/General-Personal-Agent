@@ -109,7 +109,7 @@ export function ConversationHistoryPage({
   }
 
   function openConversation(item: ConversationSummary) {
-    // ADR-019: history is the text/management surface. Continuing this
+    // History is the text/management surface. Continuing this
     // conversation by voice is the explicit mode switch inside the text page.
     navigate(`/interact/text/${item.conversationId}`);
   }

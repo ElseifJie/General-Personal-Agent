@@ -1,4 +1,4 @@
--- P5: remove legacy Voice Demo / Wb / KB / memory / MA monitor tables.
+-- Remove legacy Voice Demo / Wb / KB / memory / MA monitor tables.
 -- GPA-native tables (conversation*, task_*, app_user, ov_identity, audit_log,
 -- context_outbox, context_trace, schema_migrations) are intentionally kept.
 BEGIN;

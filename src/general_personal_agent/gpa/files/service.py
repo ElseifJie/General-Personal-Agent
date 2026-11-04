@@ -6,16 +6,15 @@ import asyncio
 import hashlib
 import logging
 import mimetypes
-from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
 
 import asyncpg
 
 from general_personal_agent.gpa.errors import GpaError
-from general_personal_agent.gpa.files.extract import safe_name, sha256_bytes
+from general_personal_agent.gpa.files.extract import safe_name
 from general_personal_agent.gpa.files.store import FileStore, FileUnavailableError
 from general_personal_agent.gpa.ids import new_attachment_id, new_file_id
+from general_personal_agent.gpa.util import sha256_bytes
 
 logger = logging.getLogger(__name__)
 
@@ -38,16 +37,6 @@ def _sha256_path(path: str) -> str:
         for chunk in iter(lambda: handle.read(1 << 20), b""):
             digest.update(chunk)
     return digest.hexdigest()
-
-
-def _as_iso(value: Any) -> str | None:
-    if value is None:
-        return None
-    if isinstance(value, datetime):
-        if value.tzinfo is None:
-            value = value.replace(tzinfo=UTC)
-        return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
-    return str(value)
 
 
 class FileService:

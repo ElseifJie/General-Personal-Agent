@@ -82,7 +82,7 @@ class FakeOVClient:
 
 
 class FakeDatabase:
-    """In-memory Database double implementing the methods used by V0.5 code."""
+    """In-memory Database double implementing the methods used by the code."""
 
     def __init__(self):
         self.outbox: dict[int, dict[str, Any]] = {}

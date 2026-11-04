@@ -8,7 +8,6 @@ memory type as structured data, and refuses to read outside those two roots.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -24,6 +23,7 @@ from general_personal_agent.gpa.context.layout import (
 )
 from general_personal_agent.gpa.errors import GpaError
 from general_personal_agent.gpa.schemas import CamelModel
+from general_personal_agent.gpa.util import to_iso
 
 
 class MemoryNode(CamelModel):
@@ -107,14 +107,6 @@ def _title_of(name: str, is_dir: bool) -> str:
     return name if is_dir else name.removesuffix(".md")
 
 
-def _iso(value: Any) -> str | None:
-    if isinstance(value, datetime):
-        if value.tzinfo is None:
-            value = value.replace(tzinfo=UTC)
-        return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
-    return value
-
-
 def _node(
     layout: OvLayout,
     uri: str,
@@ -134,7 +126,7 @@ def _node(
         type=_type_of(layout, uri, is_dir=is_dir),
         title=title if title is not None else _title_of(name, is_dir),
         size=(entry or {}).get("size"),
-        updated_at=_iso((entry or {}).get("modTime")),
+        updated_at=to_iso((entry or {}).get("modTime")),
         snippet=snippet,
         scope=_scope_key(layout, uri),
         memory_type_label=MEMORY_TYPE_LABELS.get(memory_type or "", ""),

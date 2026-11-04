@@ -1,4 +1,4 @@
-"""P3 voice pipeline tests with fake ASR/TTS (no external audio services)."""
+"""Voice pipeline tests with fake ASR/TTS (no external audio services)."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""C2 OpenViking retrieval over OV's native directory layout.
+"""OpenViking retrieval over OV's native directory layout.
 
 Every query is scoped to the directory that owns the concept instead of the
 whole user tree: memory documents come from ``memories/`` (plus ``peers/``),

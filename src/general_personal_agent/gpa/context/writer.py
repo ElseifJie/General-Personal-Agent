@@ -1,4 +1,4 @@
-"""C2 context write-back: GPA turn -> OV session/outbox -> long-term memory.
+"""Context write-back: GPA turn -> OV session/outbox -> long-term memory.
 
 Writes are asynchronous and idempotent. The outbox is the retry boundary; this
 class only resolves the conversation's OV session and enqueues work.

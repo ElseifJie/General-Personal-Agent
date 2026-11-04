@@ -8,7 +8,6 @@ stays in OpenViking — the API never widens what the key is allowed to read.
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -17,6 +16,7 @@ from general_personal_agent.auth import SessionUser
 from general_personal_agent.gpa.api.deps import current_user, tenant_id
 from general_personal_agent.gpa.errors import GpaError
 from general_personal_agent.gpa.schemas import CamelModel
+from general_personal_agent.gpa.util import to_iso
 
 CONTEXT_ROOT = "viking://"
 MAX_NODES = 2000
@@ -122,7 +122,7 @@ def _node(entry: dict[str, Any]) -> ContextNode:
         name=name,
         is_dir=bool(entry.get("isDir")),
         size=size if isinstance(size, int) else None,
-        updated_at=_iso(entry.get("modTime")),
+        updated_at=to_iso(entry.get("modTime")),
     )
 
 
@@ -173,11 +173,3 @@ async def read_content(
         content=content[:MAX_CONTENT_CHARS],
         truncated=truncated,
     )
-
-
-def _iso(value: Any) -> str | None:
-    if isinstance(value, str):
-        return value
-    if isinstance(value, datetime):
-        return value.isoformat()
-    return None

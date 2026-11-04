@@ -24,6 +24,7 @@ from general_personal_agent.gpa.conversation.store import ConversationStore
 from general_personal_agent.gpa.errors import GpaError
 from general_personal_agent.gpa.ids import new_trace_id
 from general_personal_agent.gpa.logging import get_logger
+from general_personal_agent.gpa.util import to_iso
 
 logger = get_logger(__name__)
 
@@ -36,14 +37,6 @@ PERSISTED_EVENT_TYPES = {
     "artifact",
     "error",
 }
-
-
-def _iso(value: Any) -> str:
-    if isinstance(value, datetime):
-        if value.tzinfo is None:
-            value = value.replace(tzinfo=UTC)
-        return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
-    return str(value)
 
 
 _QUOTED = re.compile(r"""["'“”‘’][^"'“”‘’]{0,120}["'“”‘’]""")
@@ -676,5 +669,5 @@ def _live_delta(event) -> dict[str, Any]:
         "turn_id": event.turn_id,
         "trace_id": event.trace_id,
         "payload": event.payload,
-        "occurred_at": _iso(event.occurred_at),
+        "occurred_at": to_iso(event.occurred_at),
     }

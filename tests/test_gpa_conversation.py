@@ -1,4 +1,4 @@
-"""P1 acceptance tests: conversation/turn/SSE core, context, task inbox."""
+"""Acceptance tests: conversation/turn/SSE core, context, task inbox."""
 
 from __future__ import annotations
 

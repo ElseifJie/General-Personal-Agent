@@ -1,11 +1,11 @@
--- V0.5 上下文管理迁移（实施方案 A1/A4/A6/B1 + kb_docs 增列）
+-- 上下文管理迁移（会话/turn/context_trace/outbox/记忆目录，以及 kb_docs 增列）
 -- 原则：只增不改；每个语句可重复执行（幂等）。
 -- 用法：psql "$DATABASE_URL" -f db/migrations/002_v05.sql
 
 BEGIN;
 
 -- ---------------------------------------------------------------------------
--- A1 稳定会话：conversation_id 30 分钟活跃窗口；ov_session_id 与 OV 会话 1:1
+-- 稳定会话：conversation_id 30 分钟活跃窗口；ov_session_id 与 OV 会话 1:1
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS agent_session (
   conversation_id text PRIMARY KEY,
@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS agent_turn (
 CREATE INDEX IF NOT EXISTS agent_turn_conv_idx ON agent_turn (conversation_id, created_at);
 
 -- ---------------------------------------------------------------------------
--- A6 Context Trace（脱敏；保留 7 天，由 worker 清理）
+-- Context Trace（脱敏；保留 7 天，由 worker 清理）
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS context_trace (
   trace_id        text PRIMARY KEY,
@@ -57,7 +57,7 @@ CREATE INDEX IF NOT EXISTS context_trace_turn_idx ON context_trace (turn_id);
 CREATE INDEX IF NOT EXISTS context_trace_created_idx ON context_trace (created_at);
 
 -- ---------------------------------------------------------------------------
--- A4 Outbox：可靠投递（ov.message / ov.commit / memory.sync / kb.invalidate）
+-- Outbox：可靠投递（ov.message / ov.commit / memory.sync / kb.invalidate）
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS context_outbox (
   id               bigserial PRIMARY KEY,
@@ -83,7 +83,7 @@ CREATE INDEX IF NOT EXISTS context_outbox_conv_idx
   ON context_outbox (conversation_id, seq);
 
 -- ---------------------------------------------------------------------------
--- B1/B5 记忆目录与审计（OV 是语义内容，PG 是控制面）
+-- 记忆目录与审计（OV 是语义内容，PG 是控制面）
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS memory_item (
   memory_id      text PRIMARY KEY,
@@ -124,7 +124,7 @@ CREATE TABLE IF NOT EXISTS memory_event (
 CREATE INDEX IF NOT EXISTS memory_event_user_idx ON memory_event (app_user_id, created_at DESC);
 
 -- ---------------------------------------------------------------------------
--- C1/C2 个人 KB：kb_docs 增列（保留旧 status 约束，细化状态进 phase）
+-- 个人 KB：kb_docs 增列（保留旧 status 约束，细化状态进 phase）
 -- A5 共享 KB 写审计
 -- ---------------------------------------------------------------------------
 ALTER TABLE kb_docs ADD COLUMN IF NOT EXISTS phase text NOT NULL DEFAULT 'processing';

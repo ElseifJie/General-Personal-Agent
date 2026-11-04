@@ -1,6 +1,5 @@
 import type { KeyboardEvent, ReactNode } from "react";
 import type { PanelDescriptor } from "./shell-state";
-import "./shell.css";
 
 export interface PanelHostProps {
   panels: readonly PanelDescriptor[];

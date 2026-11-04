@@ -1,4 +1,4 @@
-"""P4 end-to-end smoke: task_run -> MaExecutor -> task_event -> inbox.
+"""End-to-end smoke: task_run -> MaExecutor -> task_event -> inbox.
 
 Requires real MA credentials in .env. Runs one small MA session, then asserts
 the task reaches a terminal state and the inbox projects it into the

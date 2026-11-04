@@ -1,5 +1,5 @@
 /**
- * GPA-native conversation client (P2).
+ * GPA-native conversation client.
  *
  * The wire format is camelCase and authenticated by the existing `gpa_session`
  * cookie. This module deliberately stays separate from the legacy `api.ts`

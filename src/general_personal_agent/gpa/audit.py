@@ -1,4 +1,4 @@
-"""Best-effort audit writes for GPA actions (P0/P5 security baseline)."""
+"""Best-effort audit writes for GPA actions (security baseline)."""
 
 from __future__ import annotations
 

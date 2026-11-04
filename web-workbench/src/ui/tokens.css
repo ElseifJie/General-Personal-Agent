@@ -25,7 +25,7 @@
   --ui-line-height-control: 1.5;
   --ui-line-height-heading: 1.3;
 
-  /* Luminance-stepped surfaces (spec §2 Background Surfaces). */
+  /* Luminance-stepped surfaces. */
   --ui-color-surface-canvas: #14161c;
   --ui-color-surface: #1b1e26;
   --ui-color-surface-subtle: #222632;
@@ -36,7 +36,7 @@
   --ui-color-border: #303542;
   --ui-color-border-strong: #464e60;
 
-  /* Four-step text ramp (spec §2 Text & Content). */
+  /* Four-step text ramp. */
   --ui-color-text: #f7f8f8;
   --ui-color-text-secondary: #d0d6e0;
   --ui-color-text-muted: #a0a8ba;
@@ -65,8 +65,8 @@
   --ui-color-overlay: rgb(0 0 0 / 85%);
   --ui-color-embed-canvas: #ffffff;
 
-  /* Depth on dark surfaces comes from luminance steps, not shadow darkness
-   * (spec §6); shadows only soften floating layers. */
+  /* Depth on dark surfaces comes from luminance steps, not shadow darkness;
+   * shadows only soften floating layers. */
   --ui-shadow-raised: 0 2px 8px rgb(0 0 0 / 10%);
   --ui-shadow-overlay: 0 16px 48px rgb(0 0 0 / 32%);
 

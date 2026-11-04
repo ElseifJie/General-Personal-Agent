@@ -89,7 +89,11 @@ async def test_a2a_executor_completes_and_stores_artifact(gpa_env):
         executor="a2a",
     )
     settings = env.settings.model_copy(
-        update={"a2a_agent_url": "http://a2a.test/rpc", "a2a_poll_interval_s": 0.5}
+        update={
+            "a2a_agent_url": "http://a2a.test/rpc",
+            "a2a_allowed_hosts": "a2a.test",
+            "a2a_poll_interval_s": 0.5,
+        }
     )
     tos = FakeTOS()
     client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
@@ -100,4 +104,32 @@ async def test_a2a_executor_completes_and_stores_artifact(gpa_env):
     assert "A2A 完成" in view["summary"]
     assert view["artifacts"]
     assert tos.puts and tos.puts[0][0].startswith("general-personal-agent/tasks/")
+    await client.aclose()
+
+
+async def test_a2a_executor_rejects_private_brief_url(gpa_env):
+    """A task-chosen URL must not turn the executor into an SSRF proxy."""
+    env = gpa_env
+    env.settings.a2a_enabled = True
+    conversation = await env.conversations.create(
+        tenant_id=env.tenant, app_user_id=env.user, title="A2A SSRF", channel="text"
+    )
+    task = await env.tasks.submit(
+        tenant_id=env.tenant,
+        app_user_id=env.user,
+        conversation_id=conversation["conversation_id"],
+        goal="委托 A2A",
+        task_type="general",
+        brief={"a2a_url": "http://169.254.169.254/latest/meta-data/"},
+        executor="a2a",
+    )
+    settings = env.settings.model_copy(
+        update={"a2a_agent_url": "http://a2a.test/rpc", "a2a_allowed_hosts": "a2a.test"}
+    )
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    executor = A2aExecutor(settings, env.task_store, tos=FakeTOS(), http=client)
+    assert await executor.run_once() is True
+    view = await env.tasks.get(task["task_id"], env.tenant, env.user)
+    assert view["status"] == "failed"
+    assert "169.254.169.254" in executor.last_error
     await client.aclose()

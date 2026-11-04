@@ -1,6 +1,5 @@
 import {
   Archive,
-  ArchiveRestore,
   Mic,
   Pencil,
   Pin,

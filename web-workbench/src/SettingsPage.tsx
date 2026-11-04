@@ -64,7 +64,7 @@ export function SettingsPage({
           语音交互
         </h2>
         <p>
-          语音采集、实时字幕、流式 TTS 与打断在 P3 接入；文本与语音严格共享同一
+          语音采集、实时字幕、流式 TTS 与打断已接入；文本与语音严格共享同一
           conversation，切换模态不会新建会话。
         </p>
         <a className="ui-button ui-button--secondary ui-button--default" href="/interact/voice">

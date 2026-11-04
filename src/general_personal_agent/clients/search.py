@@ -1,6 +1,6 @@
 """Search providers: Ark Responses web_search and VeADK web_search (Torchlight).
 
-Resilience notes (2026-10-29 incident)
+Resilience notes (STS credential rotation)
 -------------------------------------
 ``VOLCENGINE_*`` are short-lived STS credentials.  The process reads them once at
 startup, so after an expiry/rotation every Torchlight call failed fast with

@@ -15,11 +15,12 @@ import httpx
 from general_personal_agent.clients.ov import OpenVikingClient, OVError
 from general_personal_agent.gpa.context.layout import build_layout, safe_segment
 from general_personal_agent.gpa.errors import GpaError
-from general_personal_agent.gpa.files.extract import safe_name, sha256_bytes
+from general_personal_agent.gpa.files.extract import safe_name
 from general_personal_agent.gpa.files.guard import KbReadGuard
 from general_personal_agent.gpa.files.service import FileService
 from general_personal_agent.gpa.files.store import FileStore
 from general_personal_agent.gpa.ids import new_file_job_id, new_kb_doc_id
+from general_personal_agent.gpa.util import sha256_bytes
 
 logger = logging.getLogger(__name__)
 

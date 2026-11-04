@@ -1,4 +1,4 @@
-"""Conversation API + SSE (integration-spec §2)."""
+"""Conversation API + SSE."""
 
 from __future__ import annotations
 

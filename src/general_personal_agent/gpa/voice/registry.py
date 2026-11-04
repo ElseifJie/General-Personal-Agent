@@ -1,4 +1,4 @@
-"""Single-active voice session per conversation (ADR-019 / P3)."""
+"""Single-active voice session per conversation."""
 
 from __future__ import annotations
 

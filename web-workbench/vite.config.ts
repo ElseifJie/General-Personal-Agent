@@ -1,7 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-// P2: the SPA owns `/`; FastAPI serves dist with SPA fallback (main.py).
+// The SPA owns `/`; FastAPI serves dist with SPA fallback (main.py).
 // Vite dev proxies the API/SSE to 127.0.0.1:8100.
 export default defineConfig({
   base: "/",

@@ -6,12 +6,14 @@ import asyncio
 import base64
 import time
 from typing import Any
+from urllib.parse import urlsplit
 from uuid import uuid4
 
 import httpx
 
 from general_personal_agent.gpa.logging import get_logger
 from general_personal_agent.gpa.task.store import TaskStore
+from general_personal_agent.gpa.task.url_guard import validate_outbound_url
 
 logger = get_logger(__name__)
 
@@ -57,6 +59,10 @@ class A2aExecutor:
     @property
     def enabled(self) -> bool:
         return bool(getattr(self.settings, "a2a_enabled", False))
+
+    def _allowed_hosts(self) -> tuple[str, ...]:
+        raw = getattr(self.settings, "a2a_allowed_hosts", "") or ""
+        return tuple(host.strip().lower().rstrip(".") for host in raw.split(",") if host.strip())
 
     def start(self) -> None:
         if not self.enabled or self._task is not None:
@@ -127,10 +133,21 @@ class A2aExecutor:
 
     async def _execute(self, task: dict[str, Any], attempt_id: str) -> None:
         brief = task.get("brief") or {}
-        url = brief.get("a2a_url") or getattr(self.settings, "a2a_agent_url", "")
-        token = brief.get("a2a_token") or getattr(self.settings, "a2a_token", "")
+        configured_url = getattr(self.settings, "a2a_agent_url", "") or ""
+        brief_url = brief.get("a2a_url") or ""
+        url = brief_url or configured_url
         if not url:
             raise RuntimeError("A2A agent URL is not configured")
+        # The task brief can choose a remote agent, but never an arbitrary host:
+        # the URL must pass the SSRF guard before any request (or token) is sent.
+        await validate_outbound_url(url, self._allowed_hosts())
+        # Only forward the operator's configured bearer token to the configured
+        # agent. A task-chosen host must supply its own token, otherwise the
+        # global token would leak to whatever URL the caller put in the brief.
+        same_agent = bool(configured_url) and urlsplit(url).hostname == urlsplit(configured_url).hostname
+        token = brief.get("a2a_token") or (
+            getattr(self.settings, "a2a_token", "") if not brief_url or same_agent else ""
+        )
         headers = {"content-type": "application/json"}
         if token:
             headers["Authorization"] = f"Bearer {token}"
@@ -201,6 +218,7 @@ class A2aExecutor:
             url,
             headers=headers,
             json={"jsonrpc": "2.0", "id": uuid4().hex, "method": method, "params": params},
+            follow_redirects=False,
         )
         response.raise_for_status()
         payload = response.json()
@@ -224,8 +242,11 @@ class A2aExecutor:
                 if file_part.get("bytes"):
                     data = base64.b64decode(file_part["bytes"])
                 elif source_ref.startswith(("http://", "https://")):
+                    # A remote agent controls source_ref; never let it point the
+                    # server at cloud metadata or internal services.
+                    await validate_outbound_url(source_ref, self._allowed_hosts())
                     async with httpx.AsyncClient(timeout=60) as http:
-                        response = await http.get(source_ref)
+                        response = await http.get(source_ref, follow_redirects=False)
                         response.raise_for_status()
                         data = response.content
                 storage_ref = None

@@ -1,4 +1,4 @@
--- P0 security: scope task idempotency keys to tenant/user.
+-- Security: scope task idempotency keys to tenant/user.
 BEGIN;
 
 DROP INDEX IF EXISTS task_run_idempotency_idx;

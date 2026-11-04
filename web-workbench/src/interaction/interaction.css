@@ -1,4 +1,4 @@
-/* GPA interaction workbench (P2): text conversation, history and task detail. */
+/* GPA interaction workbench: text conversation, history and task detail. */
 
 .gpa-page {
   display: flex;
@@ -274,10 +274,6 @@
   font: inherit;
   font-size: var(--ui-font-size-control);
   line-height: var(--ui-line-height-control);
-}
-
-.gpa-composer textarea::placeholder {
-  color: var(--ui-color-text-faint);
 }
 
 .gpa-composer__footer {
@@ -1416,14 +1412,6 @@
 
 .gpa-composer__attachment-note {
   color: var(--ui-color-text-muted);
-}
-
-.gpa-composer__attachment-error {
-  color: var(--ui-color-danger);
-}
-
-.gpa-memory-save__status.is-error {
-  color: var(--ui-color-danger);
 }
 
 /* ---------------------------------------------------------------------------

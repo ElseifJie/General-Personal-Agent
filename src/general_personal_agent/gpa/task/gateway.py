@@ -1,7 +1,7 @@
-"""Task Gateway control plane (MCP tools will wrap this service in P4).
+"""Task Gateway control plane (MCP tools wrap this service).
 
 submit_task only writes the control plane and returns quickly; execution is an
-executor concern (MaExecutor in P4). Every event is appended to task_event;
+executor concern (MaExecutor). Every event is appended to task_event;
 TaskEventInbox projects it into the conversation timeline.
 """
 

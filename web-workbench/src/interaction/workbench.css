@@ -1,5 +1,5 @@
 /*
- * P3 interaction workbench polish.
+ * Interaction workbench polish.
  *
  * The conversation surface borrows the reference session layout: a measured
  * reading column, flat transcript (a chip for what you wrote, plain text for
@@ -887,7 +887,7 @@ button.gpa-link {
   gap: var(--ui-space-2);
 }
 
-/* ADR-019: "continued from …" banner above the voice thread. */
+/* "continued from …" banner above the voice thread. */
 .gpa-resume-bar {
   display: flex;
   width: calc(100% - 2 * var(--gpa-chat-gutter));

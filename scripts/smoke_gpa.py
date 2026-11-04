@@ -1,4 +1,4 @@
-"""GPA P1 smoke: conversation -> text turn -> events/timeline/trace -> task inbox.
+"""GPA smoke: conversation -> text turn -> events/timeline/trace -> task inbox.
 
 Run against the local database (schema/migrations applied):
 

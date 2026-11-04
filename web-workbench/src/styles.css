@@ -1107,7 +1107,7 @@ select:not(.ui-select):hover {
 
 /* ---- Admin console: shared primitives (Linear tokens) ------------------ */
 
-/* Tabs: 14px / 510 with a 2px indigo indicator (spec §9.3). */
+/* Tabs: 14px / 510 with a 2px indigo indicator. */
 
 /* Stat values use the page-title tier without changing the theme palette. */
 

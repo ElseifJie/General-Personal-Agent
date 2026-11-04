@@ -1,4 +1,4 @@
--- 助手工作台（workbench）迁移 · 依据《助手工作台方案设计_v1.3》§3
+-- 助手工作台（workbench）迁移
 -- 原则：只增 + 少量改列；每个语句可重复执行（幂等）；`pending` 占位语义用
 -- “可空列 + 部分唯一索引”实现，避免 UNIQUE 与重试竞态。
 -- 用法：psql "$DATABASE_URL" -f db/migrations/003_wb.sql
@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS ma_session (
   raw_status      text,                            -- Ark 表外状态兜底（按 running 处理）
   source          text NOT NULL CHECK (source IN ('voice','workbench','automation','chain')),
   origin_task_id  text REFERENCES tasks(task_id),  -- 语音回链（tasks 为冻结归档表）
-  group_id        uuid,                            -- 多意图任务链（§3.3）
+  group_id        uuid,                            -- 多意图任务链
   seq_in_group    integer,
   chain_state     text CHECK (chain_state IN ('pending','ready','dispatched','skipped')),
   deps            jsonb NOT NULL DEFAULT '[]'::jsonb,  -- 依赖的组内 seq 列表
@@ -50,7 +50,7 @@ CREATE INDEX IF NOT EXISTS ma_session_status_idx ON ma_session (status, next_att
 CREATE INDEX IF NOT EXISTS ma_session_group_idx ON ma_session (group_id);
 
 -- ---------------------------------------------------------------------------
--- ma_session_turn：turn 结算（§3.2）—— 一次用户提交 = 一个 turn；
+-- ma_session_turn：turn 结算 —— 一次用户提交 = 一个 turn；
 -- 通知 / OV 摘要 / 产物发现 / 语音播报全部按 turn 幂等。
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS ma_session_turn (
@@ -76,7 +76,7 @@ CREATE INDEX IF NOT EXISTS ma_session_turn_open_idx
 
 -- ---------------------------------------------------------------------------
 -- ma_session_event：Ark 事件投影（唯一事实源；event_id 幂等去重）
--- 保留策略：随会话保留、删除级联；demo 期不设 TTL（P2 增加 180 天归档）。
+-- 保留策略：随会话保留、删除级联；demo 期不设 TTL（后续可增加 180 天归档）。
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS ma_session_event (
   event_id     text NOT NULL,
@@ -114,7 +114,7 @@ CREATE INDEX IF NOT EXISTS ma_session_input_user_idx
   ON ma_session_input (app_user_id, status, created_at DESC);
 
 -- ---------------------------------------------------------------------------
--- ma_session_task_group：多意图任务链（D6/§3.3）
+-- ma_session_task_group：多意图任务链
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS ma_session_task_group (
   id                     uuid PRIMARY KEY,
@@ -176,7 +176,7 @@ CREATE TABLE IF NOT EXISTS wb_notification (
 CREATE INDEX IF NOT EXISTS wb_notification_user_idx ON wb_notification (app_user_id, created_at DESC);
 
 -- ---------------------------------------------------------------------------
--- wb_automation / occurrence：自动化（P2 完整调度；本期建表）
+-- wb_automation / occurrence：自动化（完整调度后置；本期建表）
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS wb_automation (
   id          uuid PRIMARY KEY,
@@ -191,7 +191,7 @@ CREATE TABLE IF NOT EXISTS wb_automation (
   created_at  timestamptz NOT NULL DEFAULT now(),
   updated_at  timestamptz NOT NULL DEFAULT now()
 );
--- 旧库补列（kind 在 v1.3 首版迁移中缺失）
+-- 旧库补列（kind 在首版迁移中缺失）
 ALTER TABLE wb_automation ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'run'
   CHECK (kind IN ('run','remind'));
 
@@ -206,7 +206,7 @@ CREATE TABLE IF NOT EXISTS wb_automation_occurrence (
 );
 
 -- ---------------------------------------------------------------------------
--- wb_skill / wb_mcp_server / wb_personal_agent（P3；本期建表）
+-- wb_skill / wb_mcp_server / wb_personal_agent（本期建表）
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS wb_skill (
   id          uuid PRIMARY KEY,
@@ -259,7 +259,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS artifacts_session_file_unique
 CREATE INDEX IF NOT EXISTS artifacts_session_idx ON artifacts (ma_session_id, created_at DESC);
 
 -- ---------------------------------------------------------------------------
--- v_task_context：TaskSource 任务视图（设计 §5.2）—— 修复“工作台 title 为空
+-- v_task_context：TaskSource 任务视图 —— 修复“工作台 title 为空
 -- 导致【任务】段无内容”：title 回退取首条 user.message 前 24 字。
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE VIEW v_task_context AS

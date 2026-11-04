@@ -1,4 +1,4 @@
--- File upload + knowledge base (design v1.2 / implementation v1.2)
+-- File upload + knowledge base
 -- Additive only: no existing table is renamed or dropped.
 BEGIN;
 

@@ -1,4 +1,4 @@
-"""Voice WebSocket for the GPA conversation (P3).
+"""Voice WebSocket for the GPA conversation.
 
 The connection is bound to one ``conversationId``; the same conversation is
 used by the text page. Audio goes in as 16 kHz PCM, replies come back as text

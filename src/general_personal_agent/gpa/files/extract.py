@@ -8,7 +8,6 @@ metadata-only attachment instead of failing the upload.
 from __future__ import annotations
 
 import csv
-import hashlib
 import io
 import json
 import logging
@@ -195,7 +194,3 @@ def safe_name(name: str) -> str:
     base = re.sub(r"[\x00-\x1f\x7f]", "", base).strip()
     base = base.replace("..", ".")
     return base[:160] or "file"
-
-
-def sha256_bytes(data: bytes) -> str:
-    return hashlib.sha256(data).hexdigest()

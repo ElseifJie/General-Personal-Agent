@@ -42,7 +42,7 @@ export function VoiceInteractionPage({
 }
 
 /**
- * Voice entry (ADR-019): resolve first, then navigate. There is deliberately
+ * Voice entry: resolve first, then navigate. There is deliberately
  * no "start" button: the user should not have to choose new-vs-continue
  * before speaking. `?fresh=1` is the explicit "new session" escape hatch.
  */

@@ -1,6 +1,6 @@
 """SearchService resilience: credential refresh, retry, fallback, diagnostics.
 
-Regression (2026-10-29): the process held an expired STS credential snapshot, so
+Regression: the process held an expired STS credential snapshot, so
 every Torchlight call failed with ``InvalidAccessKey`` while a fresh process
 worked.  A single provider error must never end up as "联网搜索服务返回错误".
 """

@@ -104,7 +104,7 @@ async def lifespan(app: FastAPI):
         logger.warning("tts warmup failed: %s", exc)
     services = build_services(settings, db, tos, ma, search, tts)
     app.state.services = services
-    # GPA-native core (P1): conversation/agent/context + task inbox.
+    # GPA-native core: conversation/agent/context + task inbox.
     gpa = build_gpa_services(
         settings,
         db,
@@ -115,7 +115,7 @@ async def lifespan(app: FastAPI):
     )
     app.state.gpa = gpa
     await gpa.start()
-    # A4: in-process outbox sweeper (state in PG; survives restarts).
+    # In-process outbox sweeper (state in PG; survives restarts).
     if services.outbox is not None:
         services.outbox.start()
     logger.info(

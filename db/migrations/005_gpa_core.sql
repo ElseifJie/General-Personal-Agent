@@ -1,13 +1,13 @@
--- GPA-native core schema (P1 / ADR-002, ADR-003)
+-- GPA-native core schema
 --
--- Adds the conversation/ task core tables from the v1.0 design:
+-- Adds the conversation/ task core tables:
 --   conversation, conversation_turn, conversation_event,
 --   task_run, task_event, task_attempt, task_artifact,
 --   audit_log, and the conversation_seq allocator.
 --
 -- This migration is additive: it does not create or touch the Voice Demo
 -- legacy tables (ma_session/tasks/agent_session/...). Those stay dormant
--- until the P5 cleanup.
+-- until the legacy cleanup.
 --
 -- Apply:
 --   psql "$DB" -f db/migrations/005_gpa_core.sql
@@ -15,7 +15,7 @@
 BEGIN;
 
 -- ---------------------------------------------------------------------------
--- Migration bookkeeping (ADR-003: Alembic or equivalent schema_migrations)
+-- Migration bookkeeping (Alembic or equivalent schema_migrations)
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS schema_migrations (
   version     text PRIMARY KEY,
@@ -25,11 +25,11 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 
 -- The demo identity table predates GPA-native schema. Add the tenant dimension
 -- so conversation/task queries can be scoped consistently. Single-tenant for
--- now; the composite PK arrives with the P5 identity consolidation.
+-- now; the composite PK arrives with the identity consolidation.
 ALTER TABLE app_user ADD COLUMN IF NOT EXISTS tenant_id text NOT NULL DEFAULT 'demo';
 
 -- ---------------------------------------------------------------------------
--- Conversation (ADR-002: conversation is the primary model)
+-- Conversation (conversation is the primary model)
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS conversation (
   conversation_id text PRIMARY KEY,
@@ -50,7 +50,7 @@ CREATE INDEX IF NOT EXISTS conversation_channels_idx
 
 -- Atomic per-conversation sequence allocator. Both writers (ConversationService
 -- and TaskEventInbox) go through the same counters, so the persisted timeline
--- has one total order (integration-spec §2.3).
+-- has one total order.
 CREATE TABLE IF NOT EXISTS conversation_seq (
   conversation_id text NOT NULL REFERENCES conversation(conversation_id) ON DELETE CASCADE,
   scope           text NOT NULL CHECK (scope IN ('turn','event')),
@@ -102,7 +102,7 @@ CREATE INDEX IF NOT EXISTS conversation_event_task_idx
 ALTER TABLE conversation_event ADD COLUMN IF NOT EXISTS trace_id text;
 
 -- ---------------------------------------------------------------------------
--- Task (ADR-002: task is a bounded child resource of a conversation)
+-- Task (task is a bounded child resource of a conversation)
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS task_run (
   task_id         text PRIMARY KEY,
@@ -173,7 +173,7 @@ CREATE INDEX IF NOT EXISTS task_artifact_task_idx ON task_artifact (task_id, cre
 
 -- ---------------------------------------------------------------------------
 -- Context / audit (context_trace and context_outbox are shared with the
--- transition baseline; add the v1.0 columns without destructive changes)
+-- transition baseline; add the columns without destructive changes)
 -- ---------------------------------------------------------------------------
 ALTER TABLE context_trace ADD COLUMN IF NOT EXISTS budget jsonb NOT NULL DEFAULT '{}'::jsonb;
 ALTER TABLE context_trace ADD COLUMN IF NOT EXISTS channel text;

@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 from collections.abc import Iterable
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any
 
 import asyncpg
@@ -58,20 +57,6 @@ KB_COLUMNS = {
     "deleted_at",
     "delete_attempts",
 }
-
-
-def _iso(value: Any) -> str | None:
-    if value is None:
-        return None
-    if isinstance(value, datetime):
-        if value.tzinfo is None:
-            value = value.replace(tzinfo=UTC)
-        return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
-    return str(value)
-
-
-def sha256_bytes(data: bytes) -> str:
-    return hashlib.sha256(data).hexdigest()
 
 
 def task_mount_path(file_id: str, name: str) -> str:

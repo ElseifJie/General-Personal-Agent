@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-// P2 acceptance: login -> text conversation -> SSE reply -> history preview ->
+// Acceptance: login -> text conversation -> SSE reply -> history preview ->
 // mode switch keeps the same conversation. Requires FastAPI on :8100 and a
 // built SPA; set WB_E2E_PIN to DEMO_LOGIN_PIN to run.
 const PIN = process.env.WB_E2E_PIN || process.env.DEMO_LOGIN_PIN || "";

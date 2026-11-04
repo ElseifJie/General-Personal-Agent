@@ -3,17 +3,18 @@
 The persisted timeline order is ``conversation_event.seq``. Both writers —
 ConversationService and TaskEventInbox — allocate through ``next_seq`` on the
 ``conversation_seq`` counters, inside the same transaction that inserts the
-event (integration-spec §2.3 / §5.7).
+event.
 """
 
 from __future__ import annotations
 
 import base64
 import json
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any
 
 from general_personal_agent.gpa.ids import new_conversation_id, new_event_id, new_turn_id
+from general_personal_agent.gpa.util import to_iso
 
 
 class ConversationNotFound(LookupError):
@@ -24,17 +25,9 @@ class TurnConflict(RuntimeError):
     pass
 
 
-def _iso(value: datetime | None) -> str | None:
-    if value is None:
-        return None
-    if value.tzinfo is None:
-        value = value.replace(tzinfo=UTC)
-    return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
-
-
 def encode_cursor(updated_at: datetime, conversation_id: str, pinned: bool = False) -> str:
     raw = json.dumps(
-        {"p": bool(pinned), "u": _iso(updated_at), "id": conversation_id},
+        {"p": bool(pinned), "u": to_iso(updated_at), "id": conversation_id},
         separators=(",", ":"),
     ).encode()
     return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
@@ -83,7 +76,7 @@ def event_envelope(row: Any, *, conversation_id: str | None = None) -> dict[str,
         "task_id": item.get("task_id"),
         "trace_id": item.get("trace_id"),
         "payload": item.get("payload") or {},
-        "occurred_at": _iso(item.get("occurred_at")),
+        "occurred_at": to_iso(item.get("occurred_at")),
     }
 
 
@@ -609,7 +602,7 @@ class ConversationStore:
                 {
                     "kind": "turn",
                     "seq": int(turn["started_seq"]),
-                    "occurred_at": _iso(turn["created_at"]),
+                    "occurred_at": to_iso(turn["created_at"]),
                     "turn_id": turn["turn_id"],
                     "channel": turn["channel"],
                     "user_text": turn["user_text"],

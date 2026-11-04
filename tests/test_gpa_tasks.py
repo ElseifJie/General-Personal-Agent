@@ -1,4 +1,4 @@
-"""P4 task tools, MaExecutor and inbox projection tests."""
+"""Task tools, MaExecutor and inbox projection tests."""
 
 from __future__ import annotations
 
@@ -316,7 +316,7 @@ async def test_is_artifact_ignores_staged_inputs_and_meta():
 
 
 # ---------------------------------------------------------------------------
-# 预算 / 重试 / 产物抢救（2026-11-03 海报任务误杀事故的回归）
+# 预算 / 重试 / 产物抢救（任务误杀场景的回归）
 # ---------------------------------------------------------------------------
 
 

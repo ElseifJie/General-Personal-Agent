@@ -1,9 +1,9 @@
-"""A4 Outbox: reliable delivery to OpenViking with idempotency, ordering,
+"""Outbox: reliable delivery to OpenViking with idempotency, ordering,
 retry with exponential backoff, and dead-lettering.
 
-Deployment (plan §4.3): V0.5 runs an in-process asyncio sweeper that claims
+Deployment: an in-process asyncio sweeper claims
 pending rows via FOR UPDATE SKIP LOCKED and processes them sequentially (which
-preserves per-conversation order). T5 validates with kill -9 + restart: state
+preserves per-conversation order). A kill -9 + restart validation confirms state
 lives in PG, so a fresh process resumes the backlog.
 """
 

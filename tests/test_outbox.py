@@ -1,4 +1,4 @@
-"""T5/T6 outbox: idempotency, ordering, retry with backoff, dead-letter, crash resume."""
+"""Outbox: idempotency, ordering, retry with backoff, dead-letter, crash resume."""
 
 import asyncio
 
@@ -49,7 +49,7 @@ async def test_worker_preserves_order_and_delivers_once():
         ("user", "q0"), ("assistant", "a0"),
         ("user", "q1"), ("assistant", "a1"),
         ("user", "q2"), ("assistant", "a2"),
-    ], "user/assistant order must be preserved (T6)"
+    ], "user/assistant order must be preserved"
     # replay sweep delivers nothing new
     assert await worker.sweep_once() == 0
 
@@ -95,7 +95,7 @@ async def test_dead_letter_after_max_attempts():
 
 
 async def test_crash_resume_new_worker_drains_backlog():
-    """T5: enqueue -> 'kill' (never swept) -> a fresh worker processes everything."""
+    """Enqueue -> 'kill' (never swept) -> a fresh worker processes everything."""
     db = FakeDatabase()
     for i in range(4):
         await enqueue_turn(db, f"t{i}")

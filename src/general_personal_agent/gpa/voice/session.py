@@ -30,7 +30,7 @@ logger = get_logger(__name__)
 ASRFactory = Callable[[Any], StreamingASR]
 TTSStreamFactory = Callable[[Any], TTSStreamClient]
 
-# ADR-019: a short, fixed, privacy-safe cue when the voice entry resumed an
+# A short, fixed, privacy-safe cue when the voice entry resumed an
 # existing conversation. It never includes the conversation title.
 RESUME_PHRASE = "接着刚才那个继续。"
 _RESUME_PCM_CACHE: bytes | None = None
@@ -76,7 +76,7 @@ class GpaVoiceSession:
         self._answer_audio_started = False
         self._generation = 0
         self._last_metrics: dict[str, Any] = {}
-        # Filler / barge-in state (P0 voice UX).
+        # Filler / barge-in state.
         self._filler_enabled = bool(getattr(settings, "gpa_voice_filler_enabled", True))
         self._filler_spoken = False
         self._filler_ms = 0
@@ -507,7 +507,7 @@ class GpaVoiceSession:
             return
         self._closed = True
         self._generation += 1
-        # ADR-019 / D8: leaving the voice page ends the live session but does
+        # Leaving the voice page ends the live session but does
         # not cancel the running turn. Only an explicit interrupt/stop does.
         cue, self._resume_cue_task = self._resume_cue_task, None
         if cue is not None and not cue.done():

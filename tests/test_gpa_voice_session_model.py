@@ -1,4 +1,4 @@
-"""ADR-019: draft visibility, auto title, cross-conversation tasks and D8."""
+"""Draft visibility, auto title, cross-conversation tasks and page-leave behavior."""
 
 from __future__ import annotations
 

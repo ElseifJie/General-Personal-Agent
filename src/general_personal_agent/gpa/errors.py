@@ -1,4 +1,4 @@
-"""GPA API errors (integration-spec §1.2).
+"""GPA API errors.
 
 The transition baseline middleware emits ``{code, message, requestId}``. New
 GPA endpoints need the frozen envelope with ``retryable``/``details``/``trace_id``

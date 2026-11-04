@@ -1,7 +1,7 @@
 # General Personal Agent
 
-> 独立项目 · 2026-10（设计 v1.0）
-> **P0–P5 + C2 + 生产增强：GPA-native 工作台、语音、任务、记忆/KB、A2A Executor、JWT/KMS 文件/吊销、Redis、MCP HTTP OAuth/mTLS、artifact TTL/Range。**
+> 独立项目 · 2026-10
+> **GPA-native 工作台：文本/语音交互、会话与 SSE、任务与产物、记忆/知识库、文件管理、A2A 出站 Executor（默认关闭）、service JWT 与吊销、Redis 限流、MCP HTTP + OAuth、artifact TTL/Range。**
 
 General Personal Agent（GPA）是一个以 **VeADK Personal Agent** 为主体的个人 Agent 平台：
 
@@ -21,7 +21,7 @@ General Personal Agent（GPA）是一个以 **VeADK Personal Agent** 为主体�
 | Python 包 | `general_personal_agent` |
 | 数据库 | PostgreSQL；`db/schema.sql` 基线 + `db/migrations/` 增量迁移（当前到 018） |
 | 本地后端 | `http://127.0.0.1:8100/` |
-| 代码 | P0–P5 + C2 已落地：GPA-native schema、Conversation API/SSE、ContextManagerPlugin、Task Gateway/MaExecutor、OV 记忆/KB、文件与知识库、React 文本/语音工作台 |
+| 代码 | 已落地：GPA-native schema、Conversation API/SSE、ContextManagerPlugin、Task Gateway/MaExecutor、OV 记忆/KB、文件与知识库、React 文本/语音工作台 |
 | 前端 | React 单壳根路径 `/`：`/interact/text`、`/interact/voice`（按住说话/打断）、`/history`、`/tasks/:taskId`（可取消）、`/files`、`/knowledge`、`/context` |
 
 ---
@@ -46,8 +46,8 @@ TaskEventInbox → conversation events
 - ContextManager 只属于 Agent；
 - 任务结果经 TaskEventInbox 回 conversation；
 - 语音与 Agent 同机；真 cancel；
-- Agent 同进程 + MCP HTTP；A2A outbound Executor 已落地，A2A 入站 Server 后置；
-- GPA-native schema，不复用历史基线库。
+- Agent 同进程 + MCP HTTP；A2A outbound Executor 已落地（默认关闭），A2A 入站 Server 后置；
+- `db/schema.sql` 是上一代项目的历史基线，全新空库先建它，再经 `002..018` 迁移（其中 `007` 删除旧表）收敛为 GPA-native schema；不直接复用旧库数据。
 
 ---
 
@@ -104,9 +104,10 @@ GET    /api/conversations/{id}/context-traces
 POST   /api/conversations/{id}/messages      # 202 + eventsUrl
 GET    /api/conversations/{id}/events        # SSE
 POST   /api/conversations/{id}/stop
+POST   /api/conversations/{id}/memory/commit # 202，提交会话记忆
 GET    /api/conversations/{id}/files
 POST   /api/conversations/{id}/files
-DELETE /api/conversations/{id}/files/{fileId}
+DELETE /api/conversations/{id}/files/{conversationFileId}
 WS     /ws/session?conversationId=           # 16k PCM 上行 / 24k PCM 下行
 
 # 任务与产物
@@ -123,11 +124,13 @@ GET    /api/files/{fileId}/download
 POST   /api/files/{fileId}/reparse
 POST   /api/files/{fileId}/promote
 DELETE /api/files/objects/{fileId}
+DELETE /api/files/{artifactId}        # 删除产物记录
 
 # 知识库 / 记忆 / 上下文
 GET    /api/kb/entries
 GET    /api/kb/content
 DELETE /api/kb/entries
+GET    /api/kb/deletions
 GET    /api/kb/documents/{docId}/download
 POST   /api/kb/documents/{docId}/reindex
 POST   /api/kb/documents/{docId}/retry-delete
@@ -140,15 +143,22 @@ GET    /api/context/content
 POST   /api/internal/tasks
 GET    /api/internal/tasks/{id}
 POST   /api/internal/tasks/{id}/cancel
+POST   /api/internal/oauth/token      # client credentials 换 service JWT
+POST   /api/internal/oauth/revoke     # 吊销 service JWT
+
+# 系统
+GET    /health
+GET    /api/demo/users               # 演示账号列表
+GET    /api/metrics/summary
 ```
 
-P1 冒烟（不调用真实模型）：
+冒烟（不调用真实模型）：
 
 ```bash
 make smoke-gpa
 ```
 
-P3 语音链路（合成语音 -> 真实 ASR/Agent/TTS，需要真实凭证）：
+语音链路（合成语音 -> 真实 ASR/Agent/TTS，需要真实凭证）：
 
 ```bash
 make e2e-voice-gpa
@@ -187,6 +197,17 @@ WB_E2E_PIN=<pin> npx playwright test
 - 主动任务播报；
 - 独立子域/DNS/TLS；
 - 第二套语音工作台。
+
+---
+
+## 安全说明
+
+这是本地/演示级实现，公开部署前请注意：
+
+- 登录使用单一 `DEMO_LOGIN_PIN`（所有账号共用），Cookie 默认不带 `Secure`；生产环境应替换为真正的用户体系与 SSO。
+- 所有密钥（方舟、语音、OV、TOS、service JWT 等）需自行填入本机 `.env`，模板 `.env.example` 不含任何真实值；`APP_SECRET_KEY` 为空时服务拒绝启动。
+- A2A 出站 Executor 默认关闭（`A2A_ENABLED=false`）。开启前请配置 `A2A_ALLOWED_HOSTS` 白名单；任务自带或远端返回的 URL 必须通过校验，私网/云元数据地址一律拒绝，且配置的 `A2A_TOKEN` 只会发给白名单内配置的 agent。
+- `/health` 与 `/api/demo/users` 为公开端点；其余接口均需登录或 service token。`/health` 会回显凭证指纹前缀，请勿在不受信网络暴露。
 
 ---
 

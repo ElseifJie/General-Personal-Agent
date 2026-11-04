@@ -3,8 +3,7 @@ PYTHON ?= 3.12
 DB ?= postgresql://demo:demo@127.0.0.1:5432/general_personal_agent
 PORT ?= 8100
 
-.PHONY: install run dev test lint fmt smoke smoke-gpa e2e e2e-voice-gpa e2e-task-gpa e2e-artifact-tos mcp-server service-token db db-migrate build-wb recover clean
-TASK ?=
+.PHONY: install run dev test lint fmt smoke smoke-gpa e2e e2e-voice-gpa e2e-task-gpa e2e-artifact-tos mcp-server service-token db db-migrate build-wb test-wb-ui clean
 TENANT ?= demo
 SUBJECT ?= local-worker
 USERS ?= alice

@@ -1,4 +1,4 @@
-"""P3 end-to-end smoke: synthetic speech -> ASR -> GPA agent -> TTS.
+"""End-to-end smoke: synthetic speech -> ASR -> GPA agent -> TTS.
 
 Requires the local server on 127.0.0.1:8100 and real ASR/TTS/model credentials.
 The prompt audio is synthesized with the configured TTS voice, resampled to

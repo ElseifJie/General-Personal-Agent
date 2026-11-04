@@ -1,4 +1,4 @@
-"""Single-active voice session registry (ADR-019 / P3)."""
+"""Single-active voice session registry."""
 
 from __future__ import annotations
 

@@ -6,7 +6,6 @@ import { registerServiceWorker } from "./pwa";
 import "./styles.css";
 import "./interaction/interaction.css";
 import "./interaction/workbench.css";
-import "./knowledge.css";
 
 const root = document.querySelector("#root");
 if (!root) throw new Error("Missing application root");

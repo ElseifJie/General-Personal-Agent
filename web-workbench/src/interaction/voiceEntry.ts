@@ -1,5 +1,5 @@
 /**
- * Voice entry resolver (ADR-019).
+ * Voice entry resolver.
  *
  * The voice page must not make the user choose "new vs continue" before
  * speaking. It resolves a target in this order:
@@ -68,7 +68,7 @@ async function resolve({
   currentId?: string | null;
 }): Promise<VoiceEntryTarget> {
   if (!fresh) {
-    // D10: clicking the sidebar "voice" entry from a conversation page must
+    // Clicking the sidebar "voice" entry from a conversation page must
     // continue that conversation, not jump to another one with a running task.
     if (currentId) {
       const detail = await getConversationOrNull(currentId);

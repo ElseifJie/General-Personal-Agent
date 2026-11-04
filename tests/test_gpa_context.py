@@ -1,4 +1,4 @@
-"""C2 context: OV retrieval slices, write-back outbox and Agent tools."""
+"""Context: OV retrieval slices, write-back outbox and Agent tools."""
 
 from __future__ import annotations
 

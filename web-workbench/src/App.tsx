@@ -29,7 +29,6 @@ import { ContextPage } from "./ContextPage";
 import { KnowledgePage } from "./KnowledgePage";
 import { SettingsPage } from "./SettingsPage";
 import { TaskDetailPage } from "./TaskDetailPage";
-import { clearSubmissionDrafts } from "./submission-drafts";
 import { WorkspaceFrame, WorkspaceNav, useShellLayout } from "./shell/index";
 import { useThemePreference, type ThemeState } from "./theme";
 import { Spinner, type NavigationItem } from "./ui/index";
@@ -257,7 +256,6 @@ function Workspace({
     try {
       await apiClient.logout();
     } finally {
-      clearSubmissionDrafts();
       clearLastActiveConversation();
       onSignedOut();
     }

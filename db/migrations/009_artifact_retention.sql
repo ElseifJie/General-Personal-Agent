@@ -1,4 +1,4 @@
--- P1: artifact retention metadata for GPA-owned copies.
+-- Artifact retention metadata for GPA-owned copies.
 BEGIN;
 
 ALTER TABLE task_artifact ADD COLUMN IF NOT EXISTS expires_at timestamptz;

@@ -1,22 +1,21 @@
-"""Context assembly and the ADK plugin that owns it (ADR-004 / ADR-011).
+"""Context assembly and the ADK plugin that owns it.
 
 The plugin is the only component that turns conversation/task state into the
 next model call's context. Adapters never touch OV, KB or MA directly.
 
-P1 implements the deterministic slices (recent turns, task context, artifacts)
-with deadlines and trace. C2 adds OV memory + personal/admin KB slices through
+Deterministic slices (recent turns, task context, artifacts) come with
+deadlines and trace. OV memory + personal/admin KB slices are added through
 an injectable retriever; failures degrade instead of blocking the turn.
 """
 
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, datetime
-from typing import Any
 
 from general_personal_agent.gpa.context.packet import ContextPacket, TaskContextItem, TokenBudget
 from general_personal_agent.gpa.logging import get_logger
 from general_personal_agent.gpa.schemas import Channel
+from general_personal_agent.gpa.util import to_iso
 
 logger = get_logger(__name__)
 
@@ -247,14 +246,14 @@ class ContextAssembler:
                 continue
             if turn.get("user_text"):
                 recent.append(
-                    {"role": "user", "text": turn["user_text"][:500], "ts": _iso(turn["created_at"])}
+                    {"role": "user", "text": turn["user_text"][:500], "ts": to_iso(turn["created_at"])}
                 )
             if turn.get("assistant_text"):
                 recent.append(
                     {
                         "role": "assistant",
                         "text": turn["assistant_text"][:500],
-                        "ts": _iso(turn["ended_at"] or turn["created_at"]),
+                        "ts": to_iso(turn["ended_at"] or turn["created_at"]),
                     }
                 )
 
@@ -265,7 +264,7 @@ class ContextAssembler:
                 progress=float(item.get("progress") or 0.0),
                 summary=str(item.get("summary") or ""),
                 task_type=str(item.get("task_type") or ""),
-                updated_at=_iso(item.get("updated_at")),
+                updated_at=to_iso(item.get("updated_at")),
             )
             for item in tasks
         ]
@@ -361,16 +360,6 @@ class ContextAssembler:
             logger.warning("context trace write failed: %s", exc)
 
 
-def _iso(value: Any) -> str | None:
-    if value is None:
-        return None
-    if isinstance(value, datetime):
-        if value.tzinfo is None:
-            value = value.replace(tzinfo=UTC)
-        return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
-    return str(value)
-
-
 def build_context_plugin(
     *,
     assembler: ContextAssembler,
@@ -416,7 +405,7 @@ def build_context_plugin(
             return None
 
         async def after_agent_callback(self, *, agent, callback_context):
-            # Write-back to OV is owned by the ContextOutbox worker (C2). Keep
+            # Write-back to OV is owned by the ContextOutbox worker. Keep
             # this hook as the single future insertion point.
             return None
 

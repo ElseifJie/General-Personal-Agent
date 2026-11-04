@@ -1,6 +1,6 @@
 """Minimal process-wide services for the GPA runtime.
 
-Legacy Wb/Task/Memory/monitor services were removed in P5. What remains is the
+Legacy Wb/Task/Memory/monitor services were removed. What remains is the
 shared infrastructure needed by auth, GPA context, outbox and task execution.
 """
 

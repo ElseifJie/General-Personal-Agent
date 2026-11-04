@@ -28,7 +28,7 @@ from general_personal_agent.gpa.logging import get_logger
 
 logger = get_logger(__name__)
 
-files_router = APIRouter(prefix="/api/files", tags=["gpa-files-upload"])
+uploads_router = APIRouter(prefix="/api/files", tags=["gpa-files-upload"])
 kb_router = APIRouter(prefix="/api/kb", tags=["gpa-kb"])
 conversation_files_router = APIRouter(prefix="/api/conversations", tags=["gpa-conversation-files"])
 
@@ -68,7 +68,7 @@ def _file_view(row: dict) -> FileObjectView:
     )
 
 
-@files_router.post("", response_model=dict, status_code=201)
+@uploads_router.post("", response_model=dict, status_code=201)
 async def upload_file(
     request: Request,
     user: SessionUser = Depends(current_user),
@@ -123,7 +123,7 @@ async def upload_file(
         spooled.cleanup()
 
 
-@files_router.get("/{file_id}", response_model=FileObjectView)
+@uploads_router.get("/{file_id}", response_model=FileObjectView)
 async def get_file(file_id: str, request: Request, user: SessionUser = Depends(current_user)):
     _ensure_files(request, user)
     gpa = _svc(request)
@@ -133,7 +133,7 @@ async def get_file(file_id: str, request: Request, user: SessionUser = Depends(c
     return _file_view(row)
 
 
-@files_router.get("/{file_id}/download")
+@uploads_router.get("/{file_id}/download")
 async def download_file(file_id: str, request: Request, user: SessionUser = Depends(current_user)):
     _ensure_files(request, user)
     gpa = _svc(request)
@@ -151,7 +151,7 @@ async def download_file(file_id: str, request: Request, user: SessionUser = Depe
     return Response(content=data, media_type=content_type or row.get("mime") or "application/octet-stream", headers=headers)
 
 
-@files_router.post("/{file_id}/reparse", response_model=FileObjectView, status_code=202)
+@uploads_router.post("/{file_id}/reparse", response_model=FileObjectView, status_code=202)
 async def reparse_file(file_id: str, request: Request, user: SessionUser = Depends(current_user)):
     _ensure_files(request, user)
     gpa = _svc(request)
@@ -167,7 +167,7 @@ async def reparse_file(file_id: str, request: Request, user: SessionUser = Depen
     return _file_view(fresh)
 
 
-@files_router.post("/{file_id}/promote", response_model=PromotionResult)
+@uploads_router.post("/{file_id}/promote", response_model=PromotionResult)
 async def promote_file(
     file_id: str,
     request: Request,
@@ -183,7 +183,7 @@ async def promote_file(
     return PromotionResult(doc_id=result["doc"]["doc_id"], dedupe=bool(result.get("dedupe")))
 
 
-@files_router.delete("/objects/{file_id}", status_code=204)
+@uploads_router.delete("/objects/{file_id}", status_code=204)
 async def delete_file_object(file_id: str, request: Request, user: SessionUser = Depends(current_user)):
     _ensure_files(request, user)
     gpa = _svc(request)

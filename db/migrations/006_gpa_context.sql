@@ -1,4 +1,4 @@
--- C2: conversation-scoped OpenViking session mapping and write-back counters.
+-- Conversation-scoped OpenViking session mapping and write-back counters.
 BEGIN;
 
 ALTER TABLE conversation ADD COLUMN IF NOT EXISTS ov_session_id text;

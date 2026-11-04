@@ -1,4 +1,4 @@
-"""P0 internal service-token gateway tests."""
+"""Internal service-token gateway tests."""
 
 from __future__ import annotations
 

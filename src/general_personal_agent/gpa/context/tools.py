@@ -1,4 +1,4 @@
-"""Agent tools for C2 long-term memory and knowledge base retrieval."""
+"""Agent tools for long-term memory and knowledge base retrieval."""
 
 from __future__ import annotations
 

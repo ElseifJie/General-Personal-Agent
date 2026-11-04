@@ -10,9 +10,7 @@ from general_personal_agent.gpa.api.tasks import router as tasks_router
 from general_personal_agent.gpa.files.api import (
     conversation_files_router,
     kb_router,
-)
-from general_personal_agent.gpa.files.api import (
-    files_router as uploads_router,
+    uploads_router,
 )
 
 __all__ = [

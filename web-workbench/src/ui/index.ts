@@ -37,7 +37,6 @@ export {
   type PageHeaderProps,
   type SectionHeaderProps,
 } from "./PageHeader";
-export { DataTable, type DataTableProps } from "./DataTable";
 export {
   AppShell,
   UserMenu,

@@ -1,5 +1,7 @@
--- 语音 Agent Demo（方案 B）· Postgres schema
--- 适用：PostgreSQL 14+；本机 17.11 已验证
+-- 历史基线 schema（上一代语音 Agent Demo 遗留），不是当前最终表结构。
+-- 全新空库先执行本文件，再依次应用 db/migrations/002..018；其中 007_drop_legacy.sql
+-- 会删除本基线里不再使用的旧表，最终收敛为 GPA-native schema（见 README「当前状态」）。
+-- 适用：PostgreSQL 14+。
 -- 用法：psql "postgresql://demo:demo@127.0.0.1:5432/general_personal_agent" -f db/schema.sql
 
 BEGIN;

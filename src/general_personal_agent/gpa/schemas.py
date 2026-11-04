@@ -1,7 +1,7 @@
 """Pydantic contracts for the GPA conversation API, agent events and context.
 
-Wire format is camelCase (integration-spec §2); internal context packets are
-snake_case JSON per context-management §5.
+Wire format is camelCase; internal context packets are
+snake_case JSON.
 """
 
 from __future__ import annotations
@@ -181,7 +181,7 @@ class TimelinePage(CamelModel):
 
 
 # ---------------------------------------------------------------------------
-# Agent events (integration-spec §3.2)
+# Agent events
 # ---------------------------------------------------------------------------
 class AgentEvent(CamelModel):
     schema_version: str = "1"
@@ -196,7 +196,7 @@ class AgentEvent(CamelModel):
 
 
 # ---------------------------------------------------------------------------
-# Task Gateway (integration-spec §5.2)
+# Task Gateway
 # ---------------------------------------------------------------------------
 class ArtifactRef(CamelModel):
     artifact_id: str
@@ -225,7 +225,7 @@ class TaskView(CamelModel):
 
 
 # ---------------------------------------------------------------------------
-# Context packet (context-management §5)
+# Context packet
 # ---------------------------------------------------------------------------
 class RecentTurn(BaseModel):
     role: Literal["user", "assistant"]

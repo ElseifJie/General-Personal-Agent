@@ -1,6 +1,6 @@
 """TaskEventInbox: project async task events into the conversation timeline.
 
-MVP is passive (ADR-007): the inbox writes conversation_event + marks
+MVP is passive: the inbox writes conversation_event + marks
 task_event.projected_at atomically; it never generates an Agent turn. UI sees
 task cards via SSE and the next context assembly includes task_context.
 """
