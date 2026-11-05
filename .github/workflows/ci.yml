@@ -44,12 +44,16 @@ jobs:
           TEST_DATABASE_URL: postgresql+asyncpg://demo:demo@127.0.0.1:5432/gpa_test
           DATABASE_URL: postgresql+asyncpg://demo:demo@127.0.0.1:5432/gpa_app_never_used
         # TEMP DIAGNOSTIC (revert once green): -x so the FIRST failure aborts
-        # with a proper summary (previous runs died mid-run with none), plus
-        # faulthandler stacks if it hangs instead.
+        # with a proper summary (previous runs died mid-run with none). Also
+        # print the pytest version/plugins: CI rejected --faulthandler-timeout
+        # that both local pytest 9.1.1 and 9.2.0 accept, so the installed
+        # pytest differs from what resolves locally.
         run: |
           set -o pipefail
           echo PYTEST_START
-          .venv/bin/pytest -x --tb=short --faulthandler-timeout=120 2>&1 | tee /tmp/pytest.log
+          .venv/bin/pytest --version --version 2>&1 | head -25 || true
+          .venv/bin/python -c "import pytest,sys; print('pytest', pytest.__version__, pytest.__file__); print('python', sys.version)" || true
+          .venv/bin/pytest -x --tb=short 2>&1 | tee /tmp/pytest.log
           code=$?
           echo "PYTEST_DONE code=$code"
           exit $code
