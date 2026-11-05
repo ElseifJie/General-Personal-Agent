@@ -267,6 +267,11 @@ async def test_context_plugin_renders_task_context(gpa_env):
     )
     result = await plugin.before_model_callback(callback_context=context, llm_request=request)
     assert result is None
+    # A slow store must degrade loudly, never silently drop the task facts
+    # this test asserts on (regression: a 200 ms slice timeout on CI turned
+    # the whole rendered instruction into "").
+    assert plugin.last_packet is not None
+    assert {"task_context_timeout", "task_context_error"}.isdisjoint(plugin.last_packet.degraded)
     instruction = request.config.system_instruction or ""
     assert "任务上下文" in instruction
     assert task["task_id"] in instruction

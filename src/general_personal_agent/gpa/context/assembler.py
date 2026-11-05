@@ -165,10 +165,16 @@ class ContextAssembler:
         degraded: list[str] = []
         started = asyncio.get_running_loop().time()
 
+        # DB slices share the assembly budget, but a Postgres round-trip does
+        # not get cheaper because the budget is small: under load even an
+        # indexed query can exceed 200 ms, and silently dropping task facts
+        # over a tight cap loses the answer the user asked for. Keep a 250 ms
+        # floor; the slices run in parallel, so the wall clock stays inside
+        # the budget anyway.
         async def slice_recent_turns():
             try:
                 turns = await asyncio.wait_for(
-                    self.store.list_turns(conversation_id, limit=8), timeout=max(0.05, budget_ms / 2000)
+                    self.store.list_turns(conversation_id, limit=8), timeout=max(0.25, budget_ms / 2000)
                 )
                 return turns, None
             except TimeoutError:
@@ -181,7 +187,7 @@ class ContextAssembler:
             try:
                 tasks = await asyncio.wait_for(
                     self.store.get_task_context(conversation_id, limit=5),
-                    timeout=max(0.05, budget_ms / 4000),
+                    timeout=max(0.25, budget_ms / 2000),
                 )
                 return tasks, None
             except TimeoutError:
@@ -194,7 +200,7 @@ class ContextAssembler:
             try:
                 return await asyncio.wait_for(
                     self.store.get_artifacts(conversation_id, limit=5),
-                    timeout=max(0.05, budget_ms / 4000),
+                    timeout=max(0.25, budget_ms / 2000),
                 ), None
             except TimeoutError:
                 return [], "artifact_timeout"

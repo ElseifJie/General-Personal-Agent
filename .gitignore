@@ -62,3 +62,6 @@ web-workbench/.vite/
 .DS_Store
 Thumbs.db
 *.swp
+
+# 本地会话产生的杂散文件，不入库
+/lark-auth-qr.png
