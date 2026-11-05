@@ -19,8 +19,6 @@ classifiers = [
   "Programming Language :: Python :: 3.13",
   "Topic :: Communications :: Chat",
 ]
-[project.urls]
-Repository = "https://github.com/ElseifJie/General-Personal-Agent"
 requires-python = ">=3.12,<3.14"
 dependencies = [
   "fastapi>=0.115",
@@ -41,6 +39,9 @@ dependencies = [
   "openpyxl>=3.1",
   "veadk-python>=1.1.18,<2",
 ]
+
+[project.urls]
+Repository = "https://github.com/ElseifJie/General-Personal-Agent"
 
 [project.optional-dependencies]
 dev = [
