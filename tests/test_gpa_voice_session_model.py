@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 from types import SimpleNamespace
 
 import pytest
 
 from general_personal_agent.gpa.task.tools import TaskToolState, build_task_tools
-from general_personal_agent.gpa.voice.session import GpaVoiceSession
+from general_personal_agent.gpa.voice import session as voice_session_module
+from general_personal_agent.gpa.voice.session import RESUME_PHRASE, GpaVoiceSession
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
 
@@ -245,14 +247,23 @@ class _CueTTSHttp:
 
 
 class _CueTTSStream:
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
     async def warmup(self) -> None:
         return None
+
+    async def synthesize_pcm(self, text: str) -> bytes:
+        self.calls.append(text)
+        return b"\x00\x00" * 16
 
     async def close(self) -> None:
         return None
 
 
-def _cue_session(*, resume_cue: bool) -> tuple[GpaVoiceSession, _CueWebSocket, _CueTTSHttp]:
+def _cue_session(
+    *, resume_cue: bool
+) -> tuple[GpaVoiceSession, _CueWebSocket, _CueTTSHttp, _CueTTSStream]:
     gpa = SimpleNamespace(bus=_CueBus(), conversations=SimpleNamespace())
     settings = SimpleNamespace(
         tts_max_sentence_chars=30,
@@ -262,6 +273,7 @@ def _cue_session(*, resume_cue: bool) -> tuple[GpaVoiceSession, _CueWebSocket, _
     )
     websocket = _CueWebSocket()
     tts_http = _CueTTSHttp()
+    tts_stream = _CueTTSStream()
     session = GpaVoiceSession(
         websocket=websocket,
         gpa=gpa,
@@ -274,15 +286,19 @@ def _cue_session(*, resume_cue: bool) -> tuple[GpaVoiceSession, _CueWebSocket, _
         },
         settings=settings,
         tts_http=tts_http,
-        tts_stream_factory=lambda _settings: _CueTTSStream(),
+        tts_stream_factory=lambda _settings: tts_stream,
         resume_cue=resume_cue,
     )
-    return session, websocket, tts_http
+    return session, websocket, tts_http, tts_stream
 
 
 @pytest.mark.integration
-async def test_resume_cue_plays_once_for_resumed_session():
-    session, websocket, _tts = _cue_session(resume_cue=True)
+async def test_resume_cue_uses_answer_voice_not_legacy_http_engine():
+    # The cue is a "quick answer" played at 接入 time. It must be rendered by
+    # the SAME streaming engine as the real answer, otherwise the user hears a
+    # second, slightly different voice before the reply even starts.
+    voice_session_module._RESUME_PCM_CACHE = None
+    session, websocket, tts_http, tts_stream = _cue_session(resume_cue=True)
     try:
         await session.start()
         await asyncio.sleep(0.1)
@@ -290,13 +306,15 @@ async def test_resume_cue_plays_once_for_resumed_session():
         assert "resume_cue" in types
         assert "audio" in types
         assert types.index("resume_cue") < types.index("audio")
+        assert RESUME_PHRASE in tts_stream.calls
+        assert tts_http.calls == []
     finally:
         await session.close()
 
 
 @pytest.mark.integration
 async def test_resume_cue_is_skipped_for_new_session_or_talking_user():
-    session, websocket, _tts = _cue_session(resume_cue=False)
+    session, websocket, _tts, _stream = _cue_session(resume_cue=False)
     try:
         await session.start()
         await asyncio.sleep(0.05)
@@ -304,7 +322,7 @@ async def test_resume_cue_is_skipped_for_new_session_or_talking_user():
     finally:
         await session.close()
 
-    talking, talking_ws, _tts2 = _cue_session(resume_cue=True)
+    talking, talking_ws, _tts2, _stream2 = _cue_session(resume_cue=True)
     talking._user_audio_started = True
     try:
         await talking.start()
@@ -312,3 +330,179 @@ async def test_resume_cue_is_skipped_for_new_session_or_talking_user():
         assert "resume_cue" not in [m["type"] for m in talking_ws.messages]
     finally:
         await talking.close()
+
+
+# ---------------------------------------------------------------------------
+# Regression: one engine for every spoken phrase, smooth start, no phantom turn
+
+
+class _ProbeWebSocket:
+    def __init__(self) -> None:
+        self.messages: list[dict] = []
+
+    async def send_json(self, payload: dict) -> None:
+        self.messages.append(payload)
+
+
+class _ProbeBus:
+    def subscribe(self, conversation_id: str):
+        return asyncio.Queue(), lambda: None
+
+
+class _ProbeStream:
+    def __init__(self, chunks: list[bytes] | None = None) -> None:
+        self.chunks = chunks
+        self.calls: list[str] = []
+
+    async def warmup(self) -> None:
+        return None
+
+    async def synthesize_pcm(self, text: str) -> bytes:
+        self.calls.append(text)
+        return b"\x00\x00" * 16
+
+    async def stream(self, text: str):
+        self.calls.append(text)
+        for chunk in self.chunks or [b"\x00\x00" * 16]:
+            yield chunk
+
+    async def close(self) -> None:
+        return None
+
+
+class _HallucinatingASR:
+    """Generative ASR fed silence: returns a plausible short hallucination."""
+
+    async def start(self, on_partial=None) -> None:
+        return None
+
+    async def send(self, _chunk: bytes) -> None:
+        return None
+
+    async def finish(self) -> str:
+        return "长江"
+
+    async def close(self) -> None:
+        return None
+
+
+def _probe_session(*, stream, asr_factory, submit):
+    settings = SimpleNamespace(
+        tts_max_sentence_chars=30,
+        gpa_voice_filler_enabled=False,
+        tts_sample_rate=24_000,
+        asr_sample_rate=16_000,
+    )
+    gpa = SimpleNamespace(
+        bus=_ProbeBus(),
+        conversations=SimpleNamespace(submit_text=submit, stop=lambda *a, **k: None),
+    )
+    ws = _ProbeWebSocket()
+    session = GpaVoiceSession(
+        websocket=ws,
+        gpa=gpa,
+        conversation={
+            "conversation_id": "c_probe",
+            "tenant_id": "demo",
+            "app_user_id": "u_probe",
+            "active_channel": "voice",
+            "channels": ["voice"],
+        },
+        settings=settings,
+        tts_http=None,
+        asr_factory=asr_factory,
+        tts_stream_factory=lambda _settings: stream,
+    )
+    return session, ws
+
+
+@pytest.mark.asyncio
+async def test_noise_only_asr_final_does_not_start_a_phantom_turn():
+    """A silent/quick tap during 连接中 must not become a real user turn."""
+    submitted: list[str] = []
+
+    async def submit(*_args, **kwargs):
+        submitted.append(kwargs.get("content", ""))
+        return {"turn_id": "t1"}
+
+    session, ws = _probe_session(
+        stream=_ProbeStream(),
+        asr_factory=lambda _s: _HallucinatingASR(),
+        submit=submit,
+    )
+    await session.audio(b"\x00" * 6400)  # 200 ms of digital silence
+    await session.audio_end()
+    finals = [m for m in ws.messages if m["type"] == "final"]
+    assert finals and finals[-1]["text"] == ""
+    assert submitted == []
+    await session.close()
+
+
+@pytest.mark.asyncio
+async def test_voiced_asr_final_still_starts_a_turn():
+    """Real speech must not be swallowed by the noise guard."""
+    submitted: list[str] = []
+
+    async def submit(*_args, **kwargs):
+        submitted.append(kwargs.get("content", ""))
+        return {"turn_id": "t1"}
+
+    session, ws = _probe_session(
+        stream=_ProbeStream(),
+        asr_factory=lambda _s: _HallucinatingASR(),
+        submit=submit,
+    )
+    await session.audio(b"\x00\x10" * 2400)  # 150 ms of voiced 16 kHz PCM
+    await session.audio_end()
+    assert submitted == ["长江"]
+    await session.close()
+
+
+@pytest.mark.asyncio
+async def test_streaming_chunks_are_coalesced_into_large_audio_frames():
+    """Many tiny TTS chunks must not become many tiny WS audio frames."""
+    tiny = b"\x01\x00" * 50  # 100 bytes (~2 ms of audio)
+    stream = _ProbeStream(chunks=[tiny] * 100)  # 10 KB total
+
+    async def submit(*_args, **_kwargs):
+        raise AssertionError("not used")
+
+    session, ws = _probe_session(
+        stream=stream,
+        asr_factory=lambda _s: _HallucinatingASR(),
+        submit=submit,
+    )
+    await session._speak("这是一段足够长的回答，用来验证音频帧合并。")
+    frames = [base64.b64decode(m["data"]) for m in ws.messages if m["type"] == "audio"]
+    assert frames, "no audio emitted"
+    # 10 KB of PCM should be ~2 coalesced frames, never 100 minuscule ones.
+    assert len(frames) <= 2
+    assert all(len(frame) >= 1024 for frame in frames)
+    await session.close()
+
+
+@pytest.mark.asyncio
+async def test_stream_failure_retries_same_engine_and_never_uses_http():
+    """A failed stream must not fall back to the legacy HTTP voice."""
+
+    class FailingStream(_ProbeStream):
+        async def stream(self, text: str):
+            self.calls.append(text)
+            raise RuntimeError("tts socket closed")
+            yield b""  # pragma: no cover - keeps this an async generator
+
+    async def submit(*_args, **_kwargs):
+        raise AssertionError("not used")
+
+    stream = FailingStream()
+    session, ws = _probe_session(
+        stream=stream,
+        asr_factory=lambda _s: _HallucinatingASR(),
+        submit=submit,
+    )
+    await session._speak("测试兜底路径。")
+    # Retried once through the same (fresh) streaming client; no audio and no
+    # HTTP engine involved, so no second voice can leak into the broadcast.
+    assert len(stream.calls) == 2
+    assert not [m for m in ws.messages if m["type"] == "audio"]
+    await session.close()

@@ -203,6 +203,20 @@ class TTSStreamClient:
             finally:
                 self._session_id = None
 
+    async def synthesize_pcm(self, text: str) -> bytes:
+        """One-shot synthesis through the SAME engine/voice as ``stream``.
+
+        Fixed cues and the post-failure retry use this so every spoken phrase is
+        produced by one engine with one speaker / sample-rate / prosody. Routing
+        a cue through the legacy HTTP TTS client renders it with a different
+        acoustic model, so the listener hears a second, slightly different
+        voice right before the reply.
+        """
+        buffer = bytearray()
+        async for chunk in self.stream(text):
+            buffer += chunk
+        return bytes(buffer)
+
     async def close(self) -> None:
         ws, self._ws = self._ws, None
         if ws is None:

@@ -22,9 +22,10 @@ MAX_SOURCES = 5
 
 def build_search_tools(search: SearchService, *, max_summary_chars: int = DEFAULT_MAX_SUMMARY_CHARS) -> list:
     async def web_search(query: str) -> dict[str, Any]:
-        """联网搜索最新信息：天气、新闻、热搜、汇率、股价、比分、发布会等。
+        """联网查证外部事实：天气、新闻、汇率等实时信息，以及你不熟悉或没把握的产品、公司、组织、人物、术语、事件的介绍、是否存在与归属。
 
-        query 用自然语言（用户当前语言）。返回摘要与来源；实时信息必须以此为准。
+        遇到不认识、不确定或疑似听错的名词/产品名时也用它查证（例如用户要你「介绍一下 X」），不要先让用户澄清。
+        query 用自然语言（用户当前语言）。返回摘要与来源；外部事实必须以此为准。
         """
         clean = (query or "").strip()
         if not clean:

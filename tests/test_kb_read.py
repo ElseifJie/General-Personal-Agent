@@ -311,3 +311,59 @@ async def test_scope_is_inferred_from_the_uri():
         await service.scope_for_uri(
             tenant_id="demo", app_user_id="admin", uri="viking://user/admin/memories/profile/a.md"
         )
+
+
+# A freshly created / just-purged OV account has no ``user/<u>/resources``
+# directory yet. Listing it returns 404, which is an EMPTY knowledge base --
+# not an OV outage. The workbench must not show "OpenViking 暂时不可用".
+async def test_missing_kb_scope_root_is_empty_not_ov_unavailable():
+    from general_personal_agent.clients.ov import OVError
+
+    service, client = _service()
+
+    async def missing(uri):
+        raise OVError(404, "NOT_FOUND", f"Directory not found: {uri}")
+
+    client.ls = missing
+    result = await service.entries(tenant_id="demo", app_user_id="admin", scope="private")
+    assert result["items"] == []
+    assert result["degraded"] == []
+
+
+async def test_missing_scope_root_on_search_is_also_empty():
+    from general_personal_agent.clients.ov import OVError
+
+    service, client = _service()
+
+    async def missing(*_args, **_kwargs):
+        raise OVError(404, "NOT_FOUND", "Directory not found")
+
+    client.search = missing
+    result = await service.entries(
+        tenant_id="demo", app_user_id="admin", scope="private", query="海报"
+    )
+    assert result["degraded"] == []
+
+
+async def test_real_ov_failure_still_marks_degraded():
+    from general_personal_agent.clients.ov import OVError
+
+    service, client = _service()
+
+    async def down(uri):
+        raise OVError(503, "UPSTREAM_ERROR", "service down")
+
+    client.ls = down
+    result = await service.entries(tenant_id="demo", app_user_id="admin", scope="private")
+    assert result["degraded"] == ["ov_unavailable"]
+
+
+async def test_unexpected_error_still_marks_degraded():
+    service, client = _service()
+
+    async def broken(uri):
+        raise RuntimeError("connection reset")
+
+    client.ls = broken
+    result = await service.entries(tenant_id="demo", app_user_id="admin", scope="private")
+    assert result["degraded"] == ["ov_unavailable"]

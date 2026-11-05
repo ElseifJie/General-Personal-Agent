@@ -55,8 +55,17 @@ class FakeTTSStream:
         self.sentences.append(text)
         yield b"\x00\x00" * 240
 
+    async def synthesize_pcm(self, text: str) -> bytes:
+        self.sentences.append(text)
+        return b"\x00\x00" * 240
+
     async def close(self):
         self.closed = True
+
+
+# ~150 ms of clearly-voiced 16 kHz s16le mono PCM. Real speech clears the
+# noise-only ASR guard; all-zero bytes would be (correctly) dropped as silence.
+VOICED_PCM = b"\x00\x10" * 2400
 
 
 class FakeTTSHttp:
@@ -103,7 +112,7 @@ async def test_voice_turn_uses_same_conversation_and_streams_audio(gpa_env):
     await session.start()
     assert "ready" in ws.types()
 
-    await session.audio(b"\x00" * 640)
+    await session.audio(VOICED_PCM)
     await session.audio_end()
     await _wait_for_messages(ws, "turn.metrics")
 
@@ -192,7 +201,7 @@ async def test_voice_realtime_turn_speaks_filler(gpa_env):
         tts_stream_factory=lambda _settings: tts_stream,
     )
     await session.start()
-    await session.audio(b"\x00" * 640)
+    await session.audio(VOICED_PCM)
     await session.audio_end()
     await _wait_for_messages(ws, "turn.metrics")
 

@@ -2,10 +2,21 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 
 function base64ToPcm(value: string): Int16Array {
   const raw = atob(value);
-  const bytes = new Uint8Array(raw.length);
-  for (let i = 0; i < raw.length; i += 1) bytes[i] = raw.charCodeAt(i);
+  // s16le PCM is 2 bytes per sample; an odd-length frame would throw in the
+  // Int16Array constructor and misalign every sample after it.
+  const usable = raw.length - (raw.length % 2);
+  const bytes = new Uint8Array(usable);
+  for (let i = 0; i < usable; i += 1) bytes[i] = raw.charCodeAt(i);
   return new Int16Array(bytes.buffer);
 }
+
+/**
+ * Schedule each playback segment this far in the future. Streaming TTS frames
+ * can arrive a little late at the start of a turn (cold WS session, network
+ * jitter); a small playout cushion keeps them from opening an audible gap on
+ * the first one or two characters. Applied once per segment, not per frame.
+ */
+const PLAYOUT_DELAY_S = 0.1;
 
 function pcmToBase64(bytes: Uint8Array): string {
   let binary = "";
@@ -66,6 +77,7 @@ export function useVoiceAudio() {
   const playPcm = useCallback((base64: string, sampleRate = 24_000) => {
     const context = contextRef.current;
     if (!context || !base64) return;
+    if (context.state === "suspended") void context.resume().catch(() => undefined);
     const pcm = base64ToPcm(base64);
     if (!pcm.length) return;
     const buffer = context.createBuffer(1, pcm.length, sampleRate);
@@ -74,7 +86,7 @@ export function useVoiceAudio() {
     const source = context.createBufferSource();
     source.buffer = buffer;
     source.connect(context.destination);
-    const startAt = Math.max(context.currentTime + 0.01, nextTimeRef.current);
+    const startAt = Math.max(context.currentTime + PLAYOUT_DELAY_S, nextTimeRef.current);
     source.start(startAt);
     nextTimeRef.current = startAt + buffer.duration;
     sourcesRef.current.add(source);

@@ -24,6 +24,16 @@ from general_personal_agent.gpa.util import sha256_bytes
 
 logger = logging.getLogger(__name__)
 
+
+def _missing_scope(exc: Exception) -> bool:
+    """A 404 on a KB scope root means the directory was never created.
+
+    A fresh OpenViking account (or a scope that was just purged) has no
+    ``user/<u>/resources`` directory yet. That is an empty knowledge base, not
+    an outage -- reporting ``ov_unavailable`` here shows a misleading warning.
+    """
+    return isinstance(exc, OVError) and exc.status == 404 and exc.code == "NOT_FOUND"
+
 #: OV ``add_resource`` terminal states (success and failure alike).
 _IMPORT_TERMINAL_STATUSES = {
     "completed",
@@ -954,6 +964,9 @@ class KbService:
                     for item in (result.get("resources") or [])
                     if item.get("uri")
                 ]
+            except OVError as exc:  # noqa: BLE001
+                if not _missing_scope(exc):
+                    degraded.append("ov_unavailable")
             except Exception:  # noqa: BLE001
                 degraded.append("ov_unavailable")
         else:
@@ -973,6 +986,10 @@ class KbService:
                             "updated_at": item.get("modTime") or item.get("updatedAt"),
                         }
                     )
+            except OVError as exc:  # noqa: BLE001
+                logger.debug("kb list ov failed: %s", exc)
+                if not _missing_scope(exc):
+                    degraded.append("ov_unavailable")
             except Exception as exc:  # noqa: BLE001
                 logger.debug("kb list ov failed: %s", exc)
                 degraded.append("ov_unavailable")

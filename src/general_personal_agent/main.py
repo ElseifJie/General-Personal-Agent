@@ -98,6 +98,10 @@ async def lifespan(app: FastAPI):
         cluster=settings.tts_cluster,
         speed_ratio=settings.tool_vespeech_speed_ratio,
     )
+    # Credential/readiness probe only. This legacy HTTP v1 engine is NOT used
+    # for anything the user hears: GpaVoiceSession synthesises every spoken
+    # phrase (cues, fillers, answers, retries) through the v3 streaming engine
+    # so the voice never changes between a quick answer and a normal reply.
     try:
         await tts.synthesize_pcm("好的，语音服务已就绪。")
     except Exception as exc:  # noqa: BLE001

@@ -2,6 +2,8 @@
 
 Regression: the Personal Agent used to get only task/context tools, so every
 realtime question ("今天几月几号" / "深圳天气") ended in "我这边没有联网能力".
+A later regression narrowed the rules to realtime data, so an unfamiliar
+product name got "我没有可靠信息，不便编造介绍" instead of a search.
 """
 
 from __future__ import annotations
@@ -181,3 +183,51 @@ async def test_search_tool_marks_transient_failure_retryable():
 
     assert result["reason"] == "transient"
     assert result["retryable"] is True
+
+
+def test_instruction_requires_search_for_unknown_entities():
+    """An unfamiliar product name needs a search, not a clarification request.
+
+    Regression: the rules used to enumerate only realtime data (weather/news/
+    prices), so "请给我介绍一下 X" ended in "我没有可靠信息，不便编造介绍".
+    """
+    instruction = build_instruction("2026-10-27（周二）")
+    assert "产品、公司、组织、人物、术语、事件" in instruction
+    assert "先调用 `web_search` 查证再回答" in instruction
+    assert "不要直接让用户澄清" in instruction
+    assert "我没有可靠信息，不便介绍" in instruction
+    # The blanket "ask the user first" guardrail is now scoped to identity/intent.
+    assert "不确定用户身份、权限或意图时先问清楚" in instruction
+    assert "不确定时先问清楚，不要自行臆测用户身份或权限。" not in instruction
+
+
+def test_instruction_without_search_does_not_order_a_missing_tool():
+    """WEB_SEARCH_RULES must be gated on the tool actually being registered."""
+    instruction = build_instruction(tool_names={"search_memory"})
+    assert "web_search" not in instruction
+    assert "不要直接让用户澄清" not in instruction
+
+
+def test_voice_instruction_distinguishes_unknown_words_from_bad_audio():
+    voice = build_instruction("2026-10-27（周二）", channel="voice")
+    assert "只有本轮音频确实听不清" in voice
+    assert "不等于听不清" in voice
+    assert "应先查证再回答" in voice
+
+
+def test_voice_addendum_does_not_name_a_tool_that_may_be_absent():
+    # VOICE_INSTRUCTION is appended unconditionally, so it must never name a
+    # tool: the same instruction can be built without web_search registered.
+    voice = build_instruction(channel="voice", tool_names={"search_memory"})
+    assert "不等于听不清" in voice
+    assert "web_search" not in voice
+
+
+def test_search_tool_description_covers_entity_lookup():
+    doc = build_search_tools(FakeSearch())[0].__doc__ or ""
+    assert "产品、公司、组织、人物、术语、事件" in doc
+    assert "不认识" in doc
+    assert "不要先让用户澄清" in doc
+    # No regression to the old "latest info only" framing.
+    assert "联网搜索最新信息" not in doc
+    assert "天气、新闻、热搜、汇率、股价、比分、发布会等" not in doc

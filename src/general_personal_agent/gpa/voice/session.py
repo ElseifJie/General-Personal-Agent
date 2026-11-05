@@ -7,8 +7,10 @@ agent/task events back as text deltas and 24 kHz PCM frames.
 
 from __future__ import annotations
 
+import array
 import asyncio
 import base64
+import math
 import time
 from collections.abc import Callable
 from typing import Any
@@ -35,6 +37,37 @@ TTSStreamFactory = Callable[[Any], TTSStreamClient]
 RESUME_PHRASE = "接着刚才那个继续。"
 _RESUME_PCM_CACHE: bytes | None = None
 
+# Streaming TTS returns many tiny PCM chunks. Sending each one as its own
+# ``audio`` frame makes the browser create a separate AudioBuffer for every
+# ~20 ms, so a chunk that lands a little late produces a gap right on the
+# first one or two characters. Coalescing into ~170 ms frames (24 kHz s16le
+# mono) gives the player one continuous buffer at the start of a sentence.
+_AUDIO_FRAME_BYTES = 8 * 1024
+
+# The bigmodel ASR (enable_ddc=True) can hallucinate a plausible short phrase
+# when fed silence/room noise -- e.g. a quick tap while the voice page is still
+# "连接中". That phantom transcript used to become a real user turn. Require a
+# little genuine voiced audio before trusting a non-empty ASR final.
+_ASR_NOISE_RMS_FLOOR = 300  # int16 RMS; real speech after AGC clears this easily
+_ASR_MIN_SPEECH_MS = 120.0
+
+
+def _voiced_ms(chunk: bytes, sample_rate: int) -> float:
+    """Milliseconds of s16le mono PCM whose RMS clears the noise floor."""
+    usable = len(chunk) - (len(chunk) % 2)
+    if usable < 2:
+        return 0.0
+    samples = array.array("h")
+    samples.frombytes(chunk[:usable])
+    if not samples:
+        return 0.0
+    total = 0
+    for value in samples:
+        total += value * value
+    if math.sqrt(total / len(samples)) < _ASR_NOISE_RMS_FLOOR:
+        return 0.0
+    return len(samples) / max(1, sample_rate) * 1000.0
+
 
 class GpaVoiceSession:
     def __init__(
@@ -56,6 +89,11 @@ class GpaVoiceSession:
         self.tenant_id = conversation["tenant_id"]
         self.app_user_id = conversation["app_user_id"]
         self.settings = settings
+        # Kept for constructor compatibility (startup readiness probe). It is
+        # deliberately NOT used to synthesise anything the user can hear: the
+        # legacy HTTP v1 endpoint renders the same voice_type through a
+        # different acoustic model than the streamed v3 engine, so every
+        # audible phrase now goes through ``tts_stream`` to keep one voice.
         self.tts_http = tts_http
         self.asr_factory = asr_factory or self._default_asr
         self.tts_stream_factory = tts_stream_factory or TTSStreamClient
@@ -87,6 +125,7 @@ class GpaVoiceSession:
         self._resume_cue_played = False
         self._resume_cue_task: asyncio.Task | None = None
         self._user_audio_started = False
+        self._speech_ms = 0.0
 
     def _default_asr(self, settings) -> StreamingASR:
         return StreamingASR(
@@ -128,9 +167,12 @@ class GpaVoiceSession:
         if not self._resume_cue or self._closed or self._user_audio_started:
             return
         pcm = _RESUME_PCM_CACHE
-        if not pcm and self.tts_http is not None:
+        if not pcm:
             try:
-                pcm = await self.tts_http.synthesize_pcm(RESUME_PHRASE)
+                # Same engine as fillers and the answer: a cue rendered by the
+                # legacy HTTP client would be heard as a second voice right at
+                # the "接入" moment, before the user has even spoken.
+                pcm = await self.tts_stream.synthesize_pcm(RESUME_PHRASE)
             except asyncio.CancelledError:
                 raise
             except Exception as exc:  # noqa: BLE001 - cue must never break voice
@@ -195,6 +237,10 @@ class GpaVoiceSession:
                 )
                 return
             self.asr = asr
+            self._speech_ms = 0.0
+        self._speech_ms += _voiced_ms(
+            chunk, int(getattr(self.settings, "asr_sample_rate", 16000))
+        )
         await self.asr.send(chunk)
 
     async def _on_partial(self, text: str) -> None:
@@ -202,6 +248,8 @@ class GpaVoiceSession:
 
     async def audio_end(self) -> None:
         asr, self.asr = self.asr, None
+        speech_ms = self._speech_ms
+        self._speech_ms = 0.0
         if asr is None:
             await self._send({"type": "final", "text": "", "asr_ms": 0})
             return
@@ -212,6 +260,14 @@ class GpaVoiceSession:
             logger.warning("ASR finish failed: %s", exc)
             text = ""
         asr_ms = int((time.perf_counter() - started) * 1000)
+        if text.strip() and speech_ms < _ASR_MIN_SPEECH_MS:
+            # The bigmodel ASR can invent a plausible short word on a
+            # silence/noise-only tap (typically while the page is still
+            # "连接中"). Letting it through starts a real turn: the agent then
+            # answers a question nobody asked and may address the user by that
+            # made-up word as if it were their name.
+            logger.info("dropping noise-only ASR final %r (voiced_ms=%.0f)", text, speech_ms)
+            text = ""
         await self._send({"type": "final", "text": text, "asr_ms": asr_ms})
         if not text.strip():
             return
@@ -271,10 +327,7 @@ class GpaVoiceSession:
             try:
                 # Same engine as the answer, otherwise the filler is heard as a
                 # second, duller voice right before the reply.
-                buffer = bytearray()
-                async for chunk in self.tts_stream.stream(phrase):
-                    buffer += chunk
-                pcm = bytes(buffer)
+                pcm = await self.tts_stream.synthesize_pcm(phrase)
             except asyncio.CancelledError:
                 raise
             except Exception as exc:  # noqa: BLE001 - filler must not break the turn
@@ -453,41 +506,75 @@ class GpaVoiceSession:
             self._answer_audio_started = True
             self._tts_active = True
             try:
-                got_audio = False
-                try:
-                    async for chunk in self.tts_stream.stream(sentence):
-                        if generation != self._generation or self._closed:
-                            return
-                        if chunk:
-                            got_audio = True
-                            await self._send_audio(chunk)
-                except asyncio.CancelledError:
-                    raise
-                except Exception as exc:  # noqa: BLE001
-                    logger.warning("streaming TTS failed: %s", exc)
-                    if generation != self._generation or self._closed:
-                        return
-                    old, self.tts_stream = self.tts_stream, self.tts_stream_factory(self.settings)
-                    asyncio.create_task(self._close_tts(old), name="gpa-voice-tts-close")
-                    if got_audio:
-                        # Part of this chunk is already on the wire. Replaying
-                        # it through the HTTP engine would repeat the words in
-                        # a second voice, so stop here instead.
-                        return
-                if not got_audio and not self._closed and generation == self._generation:
-                    try:
-                        pcm = await self.tts_http.synthesize_pcm(sentence)
-                    except asyncio.CancelledError:
-                        raise
-                    except Exception as exc:  # noqa: BLE001
-                        logger.warning("HTTP TTS failed: %s", exc)
-                        return
-                    if generation == self._generation:
-                        await self._send_audio(pcm)
+                await self._stream_sentence(sentence, generation, allow_retry=True)
             finally:
                 self._tts_active = False
 
+    async def _stream_sentence(self, sentence: str, generation: int, *, allow_retry: bool) -> None:
+        """Speak one sentence through the single streaming TTS engine.
+
+        Tiny upstream PCM chunks are coalesced into ~170 ms frames so the
+        browser plays one continuous buffer at the start of the sentence
+        instead of a fresh AudioBuffer every few samples. If the stream fails
+        before any audio reached the browser, retry once with a fresh
+        connection of the SAME engine -- never fall back to the HTTP engine,
+        which would be heard as a second voice.
+        """
+        pending = bytearray()
+        sent_audio = False
+
+        async def flush() -> None:
+            nonlocal sent_audio
+            if not pending or generation != self._generation or self._closed:
+                return
+            pcm = bytes(pending)
+            pending.clear()
+            await self._send_audio(pcm)
+            sent_audio = True
+
+        try:
+            async for chunk in self.tts_stream.stream(sentence):
+                if generation != self._generation or self._closed:
+                    return
+                if not chunk:
+                    continue
+                # PCM is 16-bit: keep the buffer sample-aligned so no frame
+                # boundary ever splits a sample.
+                if len(chunk) % 2:
+                    chunk = chunk[:-1]
+                if not chunk:
+                    continue
+                pending += chunk
+                while len(pending) >= _AUDIO_FRAME_BYTES:
+                    frame = bytes(pending[:_AUDIO_FRAME_BYTES])
+                    del pending[:_AUDIO_FRAME_BYTES]
+                    await self._send_audio(frame)
+                    sent_audio = True
+            await flush()
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("streaming TTS failed: %s", exc)
+            if generation != self._generation or self._closed:
+                return
+            # Whatever PCM we already hold is a valid prefix of this sentence;
+            # play it rather than dropping the words, then stop (never replay
+            # it: that would duplicate words / change the voice).
+            await flush()
+            old, self.tts_stream = self.tts_stream, self.tts_stream_factory(self.settings)
+            asyncio.create_task(self._close_tts(old), name="gpa-voice-tts-close")
+        if sent_audio or not allow_retry or generation != self._generation or self._closed:
+            return
+        # Nothing reached the browser: retry once through the same engine.
+        await self._stream_sentence(sentence, generation, allow_retry=False)
+
     async def _send_audio(self, pcm: bytes, *, count_first: bool = True) -> None:
+        if not pcm:
+            return
+        # s16le PCM must be emitted in whole samples; an odd trailing byte
+        # would misalign every following sample in the browser.
+        if len(pcm) % 2:
+            pcm = pcm[:-1]
         if not pcm:
             return
         if count_first and self._first_audio_ms == 0 and self._turn_started:
