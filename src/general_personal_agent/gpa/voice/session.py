@@ -266,7 +266,7 @@ class GpaVoiceSession:
             # "连接中"). Letting it through starts a real turn: the agent then
             # answers a question nobody asked and may address the user by that
             # made-up word as if it were their name.
-            logger.info("dropping noise-only ASR final %r (voiced_ms=%.0f)", text, speech_ms)
+            logger.debug("dropping noise-only ASR final %r (voiced_ms=%.0f)", text, speech_ms)
             text = ""
         await self._send({"type": "final", "text": text, "asr_ms": asr_ms})
         if not text.strip():

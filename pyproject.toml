@@ -1,12 +1,27 @@
 [build-system]
-requires = ["hatchling>=1.25"]
+requires = ["hatchling>=1.26"]
 build-backend = "hatchling.build"
 
 [project]
 name = "general-personal-agent"
-version = "0.1.0"
+version = "0.2.0"
 description = "General Personal Agent: VeADK personal agent with voice/text adapters, context management, and pluggable MA task backend"
 readme = "README.md"
+license = "MIT"
+authors = [{ name = "wangjie" }]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Operating System :: MacOS",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Communications :: Chat",
+]
+# 仓库地址待 GitHub 建仓后补充：
+# [project.urls]
+# Repository = "https://github.com/<you>/general-personal-agent"
 requires-python = ">=3.12,<3.14"
 dependencies = [
   "fastapi>=0.115",

@@ -494,10 +494,10 @@ make mcp-server                  # 127.0.0.1:8201/mcp
 - 登录使用单一 `DEMO_LOGIN_PIN`（所有账号共用），Cookie 默认不带 `Secure`；生产环境应替换为真正的用户体系与 SSO。
 - 所有密钥（方舟、语音、OV、TOS、service JWT 等）需自行填入本机 `.env`，模板 `.env.example` 不含任何真实值；`APP_SECRET_KEY` 为空时服务拒绝启动。
 - A2A 出站 Executor 默认关闭（`A2A_ENABLED=false`）。开启前请配置 `A2A_ALLOWED_HOSTS` 白名单；任务自带或远端返回的 URL 必须通过校验，私网 / 云元数据地址一律拒绝，且配置的 `A2A_TOKEN` 只会发给白名单内配置的 agent。
-- `/health` 与 `/api/demo/users` 为公开端点；其余接口均需登录或 service token。`/health` 会回显凭证指纹前缀，请勿在不受信网络暴露。
+- `/health` 与 `/api/demo/users` 为公开端点；其余接口均需登录或 service token。`/health` 会回显凭证的不可逆摘要指纹（不含任何原文片段），请勿在不受信网络暴露。
 
 ---
 
 ## 11. License
 
-本项目（含 `web-workbench/` 前端）整体采用 MIT 许可证，全文见仓库根目录 `LICENSE`。
+本项目（含 `web-workbench/` 前端）整体采用 MIT 许可证，全文见仓库根目录 `LICENSE`。前端的界面设计基线移植自作者本人的另一 MIT 项目（同一版权人），已按本项目的接口契约适配。

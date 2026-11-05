@@ -8,6 +8,7 @@ worked.  A single provider error must never end up as "联网搜索服务返回�
 from __future__ import annotations
 
 import asyncio
+import re
 from types import SimpleNamespace
 
 from general_personal_agent.clients.search import SearchResult, SearchService
@@ -253,9 +254,13 @@ async def test_credential_fingerprint_masks_secrets():
 
     fingerprint = service.credential_fingerprint()
 
-    assert fingerprint["volcengine_ak"].startswith("AKTP0U")
+    # /health is unauthenticated: fingerprints are digest-only and never echo
+    # a slice of the credential itself, prefix included.
+    assert re.fullmatch(r"[0-9a-f]{8}", fingerprint["volcengine_ak"])
+    assert re.fullmatch(r"[0-9a-f]{8}", fingerprint["volcengine_session_token"])
+    assert re.fullmatch(r"[0-9a-f]{8}", fingerprint["ark_api_key"])
+    assert "AKTP0U" not in str(fingerprint)
     assert "old-secret" not in str(fingerprint)
-    assert fingerprint["volcengine_session_token"]
 
 
 async def test_slow_primary_does_not_starve_the_fallback():

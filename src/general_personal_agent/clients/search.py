@@ -92,7 +92,9 @@ def _fingerprint(value: str) -> str:
     """Masked, non-reversible identifier for a credential (which generation?)."""
     if not value:
         return ""
-    return f"{value[:6]}…{hashlib.sha256(value.encode()).hexdigest()[:8]}"
+    # Digest only: /health is unauthenticated, so it must not echo any slice
+    # of the credential itself -- not even a short prefix.
+    return hashlib.sha256(value.encode()).hexdigest()[:8]
 
 
 @dataclass
