@@ -41,7 +41,18 @@ jobs:
         env:
           TEST_DATABASE_URL: postgresql+asyncpg://demo:demo@127.0.0.1:5432/gpa_test
           DATABASE_URL: postgresql+asyncpg://demo:demo@127.0.0.1:5432/gpa_app_never_used
-        run: .venv/bin/pytest
+        # TEMP DIAGNOSTIC (revert once green): emit failing test ids as error
+        # annotations so they are readable via the public annotations API
+        # without log access.
+        run: |
+          set -o pipefail
+          .venv/bin/pytest --tb=line -rA 2>&1 | tee /tmp/pytest.log
+          code=$?
+          grep -E '^(FAILED|ERROR)' /tmp/pytest.log | head -8 | while IFS= read -r line; do
+            echo "::error::$(printf '%s' "$line" | cut -c1-400)"
+          done
+          grep -m1 -E '^/.*\.py:[0-9]+: ' /tmp/pytest.log | cut -c1-400 | sed 's/^/::error::/'
+          exit $code
 
   build-wb:
     runs-on: ubuntu-latest
