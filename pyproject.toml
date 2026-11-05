@@ -72,4 +72,9 @@ ignore = ["E501", "B008"]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 addopts = "-q"
+# `tests.fakes` is imported from sibling test modules; without this, a bare
+# `pytest` run (CI invokes .venv/bin/pytest, which does not prepend CWD to
+# sys.path the way `python -m pytest` does) fails collection with
+# "No module named 'tests'".
+pythonpath = ["."]
 markers = ["integration: Postgres-backed integration test (skipped when PG is unavailable)"]
