@@ -43,32 +43,40 @@ jobs:
         env:
           TEST_DATABASE_URL: postgresql+asyncpg://demo:demo@127.0.0.1:5432/gpa_test
           DATABASE_URL: postgresql+asyncpg://demo:demo@127.0.0.1:5432/gpa_app_never_used
-        # TEMP DIAGNOSTIC (revert once green): the process dies before pytest
-        # prints any summary, so post the log tail + exit code to an issue
-        # (readable without log access).
+        # TEMP DIAGNOSTIC (revert once green): -x so the FIRST failure aborts
+        # with a proper summary (previous runs died mid-run with none), plus
+        # faulthandler stacks if it hangs instead.
         run: |
           set -o pipefail
-          .venv/bin/pytest --tb=short -rA 2>&1 | tee /tmp/pytest.log
+          echo PYTEST_START
+          .venv/bin/pytest -x --tb=short --faulthandler-timeout=120 2>&1 | tee /tmp/pytest.log
           code=$?
-          if [ "$code" -ne 0 ]; then
-            {
-              echo "pytest exit code: **$code**"
-              echo
-              echo '```'
-              free -m || true
-              ulimit -n || true
-              echo '--- pytest log (tail 400) ---'
-              tail -n 400 /tmp/pytest.log
-              echo '```'
-            } > /tmp/issue_body.md
-            curl -sS -f -X POST \
-              -H "Authorization: Bearer ${{ github.token }}" \
-              -H "Accept: application/vnd.github+json" \
-              "https://api.github.com/repos/${{ github.repository }}/issues" \
-              -d "$(python3 -c 'import json; print(json.dumps({"title": "CI diagnostic: test job failure", "body": open("/tmp/issue_body.md").read()[:60000]}))')" \
-              || echo "::warning::failed to create diagnostic issue"
-          fi
+          echo "PYTEST_DONE code=$code"
           exit $code
+      - name: Dump diagnostics (TEMP)
+        if: failure()
+        run: |
+          grep -E '^(FAILED|ERROR)' /tmp/pytest.log | head -8 | while IFS= read -r line; do
+            echo "::error::$(printf '%s' "$line" | cut -c1-400)"
+          done
+          {
+            echo "## CI diagnostic dump"
+            echo
+            echo '```'
+            free -m || true
+            cat /proc/loadavg || true
+            ulimit -n || true
+            dmesg 2>&1 | tail -20 || true
+            echo '--- pytest log (tail 500) ---'
+            tail -n 500 /tmp/pytest.log
+            echo '```'
+          } > /tmp/issue_body.md
+          curl -sS -f -X POST \
+            -H "Authorization: Bearer ${{ github.token }}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/issues" \
+            -d "$(python3 -c 'import json; print(json.dumps({"title": "CI diagnostic: test job failure", "body": open("/tmp/issue_body.md").read()[:60000]}))')" \
+            || echo "::warning::failed to create diagnostic issue"
 
   build-wb:
     runs-on: ubuntu-latest
