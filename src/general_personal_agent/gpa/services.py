@@ -133,6 +133,13 @@ class GpaServices:
             except (asyncio.CancelledError, Exception):
                 pass
             self._warmup_task = None
+        # In-flight turns must settle BEFORE anything their transactions touch
+        # is torn down: a turn that keeps running past this point deadlocks
+        # with cleanup DELETEs or raises "pool is closing" as an unretrieved
+        # task exception once the pool goes away (seen on CI as
+        # DeadlockDetectedError at fixture teardown cascading into a suite
+        # crash).
+        await self.conversations.drain()
         if self.ma_executor is not None:
             await self.ma_executor.stop()
         if self.artifact_janitor is not None:

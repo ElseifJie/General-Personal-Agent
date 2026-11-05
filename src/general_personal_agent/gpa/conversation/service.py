@@ -392,6 +392,24 @@ class ConversationService:
             "events_url": f"/api/conversations/{turn['conversation_id']}/events",
         }
 
+    async def drain(self, timeout_s: float = 10.0) -> None:
+        """Wait for in-flight turn tasks to settle, then stop the stragglers.
+
+        Closing the pool (or deleting a test user's rows) while a turn is
+        still settling makes ``_settle``'s transaction race the shutdown:
+        either it deadlocks with a cleanup DELETE or it later raises
+        ``pool is closing`` as an unretrieved task exception. Callers that
+        own the lifecycle must drain first.
+        """
+        tasks = [t for t in self._running.values() if not t.done()]
+        if not tasks:
+            return
+        _done, pending = await asyncio.wait(tasks, timeout=timeout_s)
+        for task in pending:
+            task.cancel()
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
+
     _KB_INTENT = re.compile(
         r"(保存|存|加入|归档|沉淀|放到|放进|上传|同步).{0,16}(知识库|共享库)"
         r"|(知识库|共享库).{0,16}(保存|存|加入|归档|沉淀|上传)"
