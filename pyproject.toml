@@ -19,9 +19,8 @@ classifiers = [
   "Programming Language :: Python :: 3.13",
   "Topic :: Communications :: Chat",
 ]
-# 仓库地址待 GitHub 建仓后补充：
-# [project.urls]
-# Repository = "https://github.com/<you>/general-personal-agent"
+[project.urls]
+Repository = "https://github.com/ElseifJie/General-Personal-Agent"
 requires-python = ">=3.12,<3.14"
 dependencies = [
   "fastapi>=0.115",

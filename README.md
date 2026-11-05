@@ -53,11 +53,9 @@ sudo apt-get update && sudo apt-get install -y postgresql-client
 ### 2.1 克隆
 
 ```bash
-git clone <你的仓库地址> general-personal-agent
+git clone https://github.com/ElseifJie/General-Personal-Agent general-personal-agent
 cd general-personal-agent
 ```
-
-> 把 `<你的仓库地址>` 换成实际的 GitHub 仓库 URL（当前仓库尚未配置 remote）。
 
 ### 2.2 准备 PostgreSQL
 
